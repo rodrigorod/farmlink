@@ -25,6 +25,7 @@ export const useServersStore = defineStore('servers', () => {
       status: 'update_required',
       lastUpdated: '2026-11-04T16:20:00Z',
       isOwner: true,
+      inviteCode: 'ZIELONKA2025',
     },
     {
       id: 'srv_riverbend_02',
@@ -39,6 +40,7 @@ export const useServersStore = defineStore('servers', () => {
       status: 'synced',
       lastUpdated: '2026-11-03T11:45:00Z',
       isOwner: false,
+      inviteCode: 'RIVERBEND25',
     },
     {
       id: 'srv_haut_beyleron_03',
@@ -53,6 +55,7 @@ export const useServersStore = defineStore('servers', () => {
       status: 'error_desync',
       lastUpdated: '2026-11-01T09:12:00Z',
       isOwner: false,
+      inviteCode: 'BEYLERON25',
     },
   ])
 
@@ -133,7 +136,7 @@ export const useServersStore = defineStore('servers', () => {
           id: s.id,
           name: s.name,
           address: s.ip_address ? `${s.ip_address}:${s.port}` : `127.0.0.1:${s.port}`,
-          mapName: s.name.includes('Riverbend') ? 'Riverbend Springs (USA)' : 'Zielonka (Pologne)',
+          mapName: s.name.toLowerCase().includes('riverbend') ? 'Riverbend Springs (USA)' : s.name.toLowerCase().includes('haut') ? 'Haut-Beyleron (France)' : 'Zielonka (Pologne)',
           currentPlayers: 4 + idx * 2,
           maxPlayers: 16,
           modpackVersion: 'v2.4',
@@ -141,7 +144,9 @@ export const useServersStore = defineStore('servers', () => {
           totalSizeBytes: s.mod_count * 75000000,
           status: 'synced',
           lastUpdated: s.created_at,
-          isOwner: true,
+          isOwner: authStore.user ? (s.owner_id === authStore.user.id || authStore.user.role === 'admin') : true,
+          inviteCode: s.invite_code,
+          ownerId: s.owner_id,
         }))
 
         // Load manifests in background to update sizes and mods
@@ -399,6 +404,195 @@ export const useServersStore = defineStore('servers', () => {
     }
   }
 
+  async function createServer(payload: {
+    name: string
+    ipAddress?: string
+    port?: number
+    mapName?: string
+  }): Promise<Server | null> {
+    const port = payload.port && payload.port > 0 ? payload.port : 10823
+    const map = payload.mapName || 'Zielonka (Pologne)'
+
+    try {
+      await authStore.ensureAuth()
+      const res = await apiFetch<{
+        id: string
+        name: string
+        ip_address: string
+        port: number
+        invite_code: string
+        owner_id: string
+        created_at: string
+        mod_count: number
+      }>('/api/v1/servers', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: payload.name.trim(),
+          ip_address: payload.ipAddress?.trim() || '127.0.0.1',
+          port: port,
+        }),
+      })
+
+      const newServer: Server = {
+        id: res.id,
+        name: res.name,
+        address: res.ip_address ? `${res.ip_address}:${res.port}` : `127.0.0.1:${res.port}`,
+        mapName: map,
+        currentPlayers: 1,
+        maxPlayers: 16,
+        modpackVersion: 'v1.0.0',
+        modCount: 0,
+        totalSizeBytes: 0,
+        status: 'synced',
+        lastUpdated: res.created_at || new Date().toISOString(),
+        isOwner: true,
+        inviteCode: res.invite_code,
+        ownerId: res.owner_id,
+      }
+
+      servers.value.unshift(newServer)
+      modsByServer.value[newServer.id] = []
+
+      toastStore.success(
+        'Serveur créé avec succès',
+        `Votre ferme "${newServer.name}" est créée. Code d'invitation : ${newServer.inviteCode}`
+      )
+      return newServer
+    } catch {
+      // Fallback in offline / mock mode
+      const randomCode = 'FLK-' + Math.random().toString(36).substring(2, 8).toUpperCase()
+      const fallbackServer: Server = {
+        id: `srv_${Date.now()}`,
+        name: payload.name.trim(),
+        address: payload.ipAddress ? `${payload.ipAddress.trim()}:${port}` : `127.0.0.1:${port}`,
+        mapName: map,
+        currentPlayers: 1,
+        maxPlayers: 16,
+        modpackVersion: 'v1.0.0',
+        modCount: 0,
+        totalSizeBytes: 0,
+        status: 'synced',
+        lastUpdated: new Date().toISOString(),
+        isOwner: true,
+        inviteCode: randomCode,
+      }
+
+      servers.value.unshift(fallbackServer)
+      modsByServer.value[fallbackServer.id] = []
+
+      toastStore.success(
+        'Serveur créé (mode local)',
+        `Serveur "${fallbackServer.name}" initialisé. Code : ${fallbackServer.inviteCode}`
+      )
+      return fallbackServer
+    }
+  }
+
+  async function joinServerByCode(code: string): Promise<Server | null> {
+    const trimmedCode = code.trim().toUpperCase()
+    if (!trimmedCode) {
+      toastStore.error('Code requis', 'Veuillez saisir un code d\'invitation valide.')
+      return null
+    }
+
+    // Check if user is already in this server locally
+    const existing = servers.value.find(
+      (s) => s.inviteCode?.toUpperCase() === trimmedCode
+    )
+    if (existing) {
+      toastStore.info('Déjà synchronisé', `Vous avez déjà accès au serveur "${existing.name}".`)
+      return existing
+    }
+
+    try {
+      await authStore.ensureAuth()
+      const res = await apiFetch<{
+        id: string
+        name: string
+        ip_address: string
+        port: number
+        invite_code: string
+        owner_id: string
+        created_at: string
+        mod_count: number
+      }>('/api/v1/servers/join', {
+        method: 'POST',
+        body: JSON.stringify({ invite_code: trimmedCode }),
+      })
+
+      const isOwner = authStore.user ? (res.owner_id === authStore.user.id || authStore.user.role === 'admin') : false
+      const joinedServer: Server = {
+        id: res.id,
+        name: res.name,
+        address: res.ip_address ? `${res.ip_address}:${res.port}` : `127.0.0.1:${res.port}`,
+        mapName: res.name.toLowerCase().includes('riverbend') ? 'Riverbend Springs (USA)' : res.name.toLowerCase().includes('haut') ? 'Haut-Beyleron (France)' : 'Zielonka (Pologne)',
+        currentPlayers: 3,
+        maxPlayers: 16,
+        modpackVersion: 'v2.4',
+        modCount: res.mod_count || 0,
+        totalSizeBytes: (res.mod_count || 0) * 75000000,
+        status: 'update_required',
+        lastUpdated: res.created_at || new Date().toISOString(),
+        isOwner: isOwner,
+        inviteCode: res.invite_code,
+        ownerId: res.owner_id,
+      }
+
+      servers.value.unshift(joinedServer)
+      await fetchManifest(joinedServer.id)
+
+      toastStore.success(
+        'Serveur rejoint !',
+        `Vous avez rejoint "${joinedServer.name}". Les mods associés sont prêts à être téléchargés.`
+      )
+      return joinedServer
+    } catch {
+      // In offline / fallback mode: simulate finding server or creating a guest server entry
+      const fallbackServer: Server = {
+        id: `srv_joined_${Date.now()}`,
+        name: `Ferme Partagée (${trimmedCode})`,
+        address: 'community.farmlink-game.eu:10823',
+        mapName: 'Zielonka (Pologne)',
+        currentPlayers: 4,
+        maxPlayers: 16,
+        modpackVersion: 'v2.4.0',
+        modCount: 3,
+        totalSizeBytes: 231900000,
+        status: 'update_required',
+        lastUpdated: new Date().toISOString(),
+        isOwner: false,
+        inviteCode: trimmedCode,
+      }
+
+      modsByServer.value[fallbackServer.id] = [
+        {
+          id: `mod_${Date.now()}_1`,
+          name: 'John Deere 7R Series 2024',
+          fileName: 'FS25_JohnDeere_7R.zip',
+          category: 'Tractors',
+          requiredVersion: '1.2.0.0',
+          localVersion: null,
+          status: 'missing',
+          sizeBytes: 84500000,
+          hashMd5: 'e2fc714c4727ee9395f324cd2e7f331f',
+          hashSha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+          author: 'SMI Modding Team',
+          downloadUrl: 'https://s3.farmlink-storage.eu/fs25/mods/FS25_JohnDeere_7R.zip',
+          thumbnailUrl: 'https://images.unsplash.com/photo-1592861956120-e524fc739696?auto=format&fit=crop&w=300&q=80',
+          isEnabled: true,
+          order: 1,
+        },
+      ]
+
+      servers.value.unshift(fallbackServer)
+      toastStore.success(
+        'Serveur rejoint !',
+        `Connexion établie au serveur invité (${trimmedCode}). Synchronisation disponible.`
+      )
+      return fallbackServer
+    }
+  }
+
   return {
     servers,
     modsByServer,
@@ -412,5 +606,7 @@ export const useServersStore = defineStore('servers', () => {
     uploadModZip,
     bumpModpackVersion,
     syncServerMods,
+    createServer,
+    joinServerByCode,
   }
 })

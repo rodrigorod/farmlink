@@ -67,6 +67,8 @@ func main() {
 
 	// Authenticated routes
 	mux.Handle("GET /api/v1/servers", authHandler.Middleware(http.HandlerFunc(serverHandler.List)))
+	mux.Handle("POST /api/v1/servers", authHandler.Middleware(http.HandlerFunc(serverHandler.Create)))
+	mux.Handle("POST /api/v1/servers/join", authHandler.Middleware(http.HandlerFunc(serverHandler.Join)))
 	mux.Handle("POST /api/v1/servers/{id}/mods/upload", authHandler.Middleware(http.HandlerFunc(modHandler.Upload)))
 	mux.Handle("DELETE /api/v1/servers/{id}/mods/{mod_id}", authHandler.Middleware(http.HandlerFunc(serverHandler.RemoveMod)))
 	mux.Handle("PATCH /api/v1/servers/{id}/mods/{mod_id}", authHandler.Middleware(http.HandlerFunc(serverHandler.ToggleMod)))

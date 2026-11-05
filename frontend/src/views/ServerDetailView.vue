@@ -67,6 +67,11 @@ function copyHash(hash: string) {
   navigator.clipboard.writeText(hash)
   toastStore.info('Empreinte copiée', `Hash : ${hash}`)
 }
+
+function copyInviteCode(code: string) {
+  navigator.clipboard.writeText(code)
+  toastStore.success('Code copié', `Code d'invitation "${code}" copié dans le presse-papier.`)
+}
 </script>
 
 <template>
@@ -111,12 +116,24 @@ function copyHash(hash: string) {
               🔴 Désynchronisé
             </Badge>
           </div>
-          <div class="flex items-center gap-4 text-xs font-mono text-muted mt-2">
+          <div class="flex flex-wrap items-center gap-4 text-xs font-mono text-muted mt-2">
             <span>Carte : <strong class="text-foreground">{{ server.mapName }}</strong></span>
             <span>&bull;</span>
             <span>Version Requise : <strong class="text-primary">{{ server.modpackVersion }}</strong></span>
             <span>&bull;</span>
             <span>{{ server.modCount }} mods ({{ formatBytes(server.totalSizeBytes) }})</span>
+            <template v-if="server.inviteCode">
+              <span>&bull;</span>
+              <span
+                class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-surface-raised border border-surface-border text-muted hover:text-foreground cursor-pointer"
+                @click="copyInviteCode(server.inviteCode)"
+                title="Cliquer pour copier le code d'invitation"
+              >
+                <span class="text-primary font-bold">CODE :</span>
+                <span class="text-foreground font-bold">{{ server.inviteCode }}</span>
+                <Copy class="w-3 h-3 text-muted hover:text-primary transition-colors" />
+              </span>
+            </template>
           </div>
         </div>
 

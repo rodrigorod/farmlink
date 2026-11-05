@@ -17,16 +17,19 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
+  Plus,
 } from 'lucide-vue-next'
 import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import GeometricSkeleton from '@/components/ui/GeometricSkeleton.vue'
+import ServerActionModal from '@/components/servers/ServerActionModal.vue'
 
 const serversStore = useServersStore()
 const companionStore = useCompanionStore()
 const toastStore = useToastStore()
 
 const isLoading = ref(true)
+const showServerModal = ref(false)
 const searchQuery = ref('')
 const selectedTld = ref('all')
 
@@ -60,6 +63,11 @@ async function simulateRefresh() {
 function copyAddress(address: string) {
   navigator.clipboard.writeText(address)
   toastStore.success('Adresse copiée', `L'adresse IP "${address}" a été copiée dans le presse-papier.`)
+}
+
+function copyInviteCode(code: string) {
+  navigator.clipboard.writeText(code)
+  toastStore.success('Code copié', `Code d'invitation "${code}" copié. Partagez-le avec vos équipiers !`)
 }
 
 async function joinServer(server: any) {
@@ -124,6 +132,11 @@ async function joinServer(server: any) {
         <Button size="sm" variant="outline" @click="simulateRefresh" :disabled="isLoading">
           <RotateCw :class="['w-3.5 h-3.5', isLoading ? 'animate-spin' : '']" />
           Actualiser
+        </Button>
+
+        <Button size="sm" variant="primary" @click="showServerModal = true">
+          <Plus class="w-3.5 h-3.5" />
+          Ajouter / Rejoindre
         </Button>
       </div>
     </div>
@@ -201,16 +214,29 @@ async function joinServer(server: any) {
                 Propriétaire
               </span>
             </div>
-            <div class="flex items-center gap-2 mt-1 text-xs text-muted font-mono">
-              <span>{{ server.address }}</span>
-              <button
-                type="button"
-                @click="copyAddress(server.address)"
-                class="hover:text-foreground p-0.5"
-                title="Copier l'adresse"
+            <div class="flex flex-wrap items-center gap-3 mt-1 text-xs text-muted font-mono">
+              <div class="flex items-center gap-1.5">
+                <span>{{ server.address }}</span>
+                <button
+                  type="button"
+                  @click="copyAddress(server.address)"
+                  class="hover:text-foreground p-0.5"
+                  title="Copier l'adresse"
+                >
+                  <Copy class="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div
+                v-if="server.inviteCode"
+                class="flex items-center gap-1.5 px-2 py-0.5 bg-surface-raised border border-surface-border text-muted hover:text-foreground text-[11px] cursor-pointer"
+                @click="copyInviteCode(server.inviteCode)"
+                title="Cliquer pour copier le code d'invitation"
               >
-                <Copy class="w-3.5 h-3.5" />
-              </button>
+                <span class="text-primary font-bold">CODE :</span>
+                <span class="text-foreground font-bold tracking-wider">{{ server.inviteCode }}</span>
+                <Copy class="w-3 h-3 text-muted hover:text-primary transition-colors" />
+              </div>
             </div>
           </div>
 
@@ -315,5 +341,11 @@ async function joinServer(server: any) {
         <span v-if="selectedTld !== 'all'"> avec l'extension "{{ selectedTld }}"</span>
       </p>
     </div>
+
+    <!-- Server Create / Join Modal -->
+    <ServerActionModal
+      :is-open="showServerModal"
+      @close="showServerModal = false"
+    />
   </div>
 </template>

@@ -23,6 +23,8 @@ export interface Server {
   status: ServerStatus;
   lastUpdated: string;
   isOwner?: boolean;
+  inviteCode?: string;
+  ownerId?: string;
 }
 
 export type LocalModStatus = 'synced' | 'missing' | 'outdated' | 'extra';

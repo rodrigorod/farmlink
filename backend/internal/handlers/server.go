@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"farmlink/backend/internal/storage"
@@ -273,4 +275,182 @@ func (h *ServerHandler) ToggleMod(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]bool{"is_active": req.IsActive})
+}
+
+// CreateServerRequest defines the payload for creating a new server.
+type CreateServerRequest struct {
+	Name       string `json:"name"`
+	IPAddress  string `json:"ip_address"`
+	Port       int    `json:"port"`
+	InviteCode string `json:"invite_code"`
+}
+
+// JoinServerRequest defines the payload for joining a server via invite code.
+type JoinServerRequest struct {
+	InviteCode string `json:"invite_code"`
+}
+
+// generateInviteCode produces a human-friendly uppercase invite code like "FLK-AB7CD9".
+func generateInviteCode() (string, error) {
+	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = charset[int(b[i])%len(charset)]
+	}
+	return "FLK-" + string(b), nil
+}
+
+// Create adds a new FS25 server where the caller is the owner.
+func (h *ServerHandler) Create(w http.ResponseWriter, r *http.Request) {
+	claims, ok := UserFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	userUUID, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		http.Error(w, `{"error":"invalid user id in token"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req CreateServerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid json body"}`, http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		http.Error(w, `{"error":"server name is required"}`, http.StatusBadRequest)
+		return
+	}
+	if len(name) > 100 {
+		name = name[:100]
+	}
+
+	ipAddress := strings.TrimSpace(req.IPAddress)
+	if len(ipAddress) > 45 {
+		ipAddress = ipAddress[:45]
+	}
+
+	port := req.Port
+	if port <= 0 || port > 65535 {
+		port = 10823
+	}
+
+	inviteCode := strings.ToUpper(strings.TrimSpace(req.InviteCode))
+	if inviteCode != "" {
+		if len(inviteCode) < 3 || len(inviteCode) > 20 {
+			http.Error(w, `{"error":"invite code must be between 3 and 20 characters"}`, http.StatusBadRequest)
+			return
+		}
+	} else {
+		code, err := generateInviteCode()
+		if err != nil {
+			http.Error(w, `{"error":"failed to generate invite code"}`, http.StatusInternalServerError)
+			return
+		}
+		inviteCode = code
+	}
+
+	serverID := uuid.New()
+	var createdServer ServerDTO
+	var ownerID uuid.UUID
+	var sID uuid.UUID
+
+	err = h.db.QueryRow(r.Context(),
+		`INSERT INTO servers (id, name, ip_address, port, invite_code, owner_id)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, name, COALESCE(ip_address, ''), port, invite_code, owner_id, created_at`,
+		serverID, name, ipAddress, port, inviteCode, userUUID,
+	).Scan(&sID, &createdServer.Name, &createdServer.IPAddress, &createdServer.Port, &createdServer.InviteCode, &ownerID, &createdServer.CreatedAt)
+
+	if err != nil {
+		http.Error(w, `{"error":"failed to create server (invite code may already exist)"}`, http.StatusConflict)
+		return
+	}
+
+	createdServer.ID = sID.String()
+	createdServer.OwnerID = ownerID.String()
+	createdServer.ModCount = 0
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(createdServer)
+}
+
+// Join associates the authenticated user to an existing server via its invite code.
+func (h *ServerHandler) Join(w http.ResponseWriter, r *http.Request) {
+	claims, ok := UserFromContext(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	userUUID, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		http.Error(w, `{"error":"invalid user id in token"}`, http.StatusUnauthorized)
+		return
+	}
+
+	var req JoinServerRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid json body"}`, http.StatusBadRequest)
+		return
+	}
+
+	code := strings.ToUpper(strings.TrimSpace(req.InviteCode))
+	if code == "" {
+		http.Error(w, `{"error":"invite code is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	var s ServerDTO
+	var serverID, ownerID uuid.UUID
+
+	err = h.db.QueryRow(r.Context(),
+		`SELECT id, name, COALESCE(ip_address, ''), port, invite_code, owner_id, created_at
+		 FROM servers
+		 WHERE UPPER(invite_code) = UPPER($1)`,
+		code,
+	).Scan(&serverID, &s.Name, &s.IPAddress, &s.Port, &s.InviteCode, &ownerID, &s.CreatedAt)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, `{"error":"server not found for invite code"}`, http.StatusNotFound)
+			return
+		}
+		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	s.ID = serverID.String()
+	s.OwnerID = ownerID.String()
+
+	// If user is not the owner, link them as a server member
+	if ownerID != userUUID {
+		_, err = h.db.Exec(r.Context(),
+			`INSERT INTO server_members (server_id, user_id)
+			 VALUES ($1, $2)
+			 ON CONFLICT (server_id, user_id) DO NOTHING`,
+			serverID, userUUID,
+		)
+		if err != nil {
+			http.Error(w, `{"error":"failed to join server"}`, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Fetch active mod count
+	_ = h.db.QueryRow(r.Context(),
+		`SELECT COUNT(mod_id) FILTER (WHERE is_active = true) FROM server_mods WHERE server_id = $1`,
+		serverID,
+	).Scan(&s.ModCount)
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(s)
 }

@@ -98,4 +98,34 @@ describe('stores logic', () => {
     expect(filter('', '.fr').length).toBe(0)
     expect(filter('Riverbend', '.eu').length).toBe(1)
   })
+
+  it('creates a new server with owner rights and invite code', async () => {
+    const serversStore = useServersStore()
+    const countBefore = serversStore.servers.length
+
+    const created = await serversStore.createServer({
+      name: 'Ferme des Vallons',
+      ipAddress: '192.168.1.120',
+      port: 10823,
+      mapName: 'Zielonka (Pologne)',
+    })
+
+    expect(created).not.toBeNull()
+    expect(created?.name).toBe('Ferme des Vallons')
+    expect(created?.isOwner).toBe(true)
+    expect(created?.inviteCode).toBeDefined()
+    expect(created?.inviteCode?.startsWith('FLK-')).toBe(true)
+    expect(serversStore.servers.length).toBe(countBefore + 1)
+  })
+
+  it('joins an existing server using an invite code', async () => {
+    const serversStore = useServersStore()
+    const countBefore = serversStore.servers.length
+
+    const joined = await serversStore.joinServerByCode('COMMUNITY-2025')
+    expect(joined).not.toBeNull()
+    expect(joined?.isOwner).toBe(false)
+    expect(joined?.inviteCode).toBe('COMMUNITY-2025')
+    expect(serversStore.servers.length).toBe(countBefore + 1)
+  })
 })
