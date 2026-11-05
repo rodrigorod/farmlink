@@ -21,3 +21,9 @@ backend/bin/
 # OS
 .DS_Store
 Thumbs.db
+
+# AI Agent Skills and Metadata
+.agents/
+**/.agents/
+skills-lock.json
+**/skills-lock.json
