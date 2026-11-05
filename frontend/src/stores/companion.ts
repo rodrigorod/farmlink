@@ -2,12 +2,14 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { CompanionState } from '@/types'
 import { useToastStore } from './toast'
+import { invoke, isTauri } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 export const useCompanionStore = defineStore('companion', () => {
   const toastStore = useToastStore()
 
   const state = ref<CompanionState>({
-    isConnected: true, // Default to true for great out-of-the-box demo experience
+    isConnected: true, // Default to connected in Tauri or simulated demo
     isConnecting: false,
     version: 'v0.4.2-rust',
     os: 'linux',
@@ -16,35 +18,78 @@ export const useCompanionStore = defineStore('companion', () => {
     syncInProgress: false,
     syncProgress: 0,
     currentSyncMod: null,
-    simulationMode: true,
+    simulationMode: !isTauri(),
   })
 
-  let socket: WebSocket | null = null
+  let unlisteners: UnlistenFn[] = []
 
   function toggleConnection() {
     state.value.isConnected = !state.value.isConnected
     if (state.value.isConnected) {
       toastStore.success(
         'App Compagnon connectée',
-        `Liaison établie avec le client Rust (${state.value.version})`
+        `Liaison établie avec le client natif (${state.value.version})`
       )
     } else {
       toastStore.warning(
         'App Compagnon déconnectée',
-        'Le client Rust n\'est plus joignable sur le port local 45823'
+        'Liaison IPC native suspendue'
       )
     }
   }
 
-  function setModsPath(path: string) {
+  async function setModsPath(path: string) {
     state.value.modsPath = path
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({ type: 'set_mods_path', path }))
+    if (isTauri()) {
+      try {
+        await invoke('set_mods_path', { path })
+        toastStore.success('Chemin mis à jour', `Dossier des mods configuré : ${path}`)
+      } catch (e) {
+        toastStore.error('Erreur', String(e))
+      }
+    } else {
+      toastStore.success('Chemin mis à jour', `Dossier des mods configuré : ${path}`)
     }
-    toastStore.success('Chemin mis à jour', `Dossier des mods configuré : ${path}`)
   }
 
-  async function syncAllMods(modNames: string[] = ['FS25_JohnDeere_7R.zip', 'FS25_Courseplay.zip', 'FS25_ClaasLexion8900.zip']) {
+  async function scanMods(modsPath?: string) {
+    if (isTauri()) {
+      try {
+        const result = await invoke<any[]>('scan_mods', { modsPath })
+        toastStore.info('Scan terminé', `${result.length} mods locaux analysés via le backend natif.`)
+        return result
+      } catch (e) {
+        toastStore.error('Erreur de scan', String(e))
+        return []
+      }
+    }
+    return []
+  }
+
+  async function launchGame(target = 'auto') {
+    if (isTauri()) {
+      try {
+        const res = await invoke<{ success: boolean; message: string }>('launch_game', { target })
+        if (res.success) {
+          toastStore.success('Jeu lancé', res.message)
+        } else {
+          toastStore.error('Erreur lancement', res.message)
+        }
+        return res
+      } catch (e) {
+        toastStore.error('Erreur', String(e))
+        return { success: false, message: String(e) }
+      }
+    } else {
+      toastStore.success('Jeu simulé', 'Simulation du lancement de Farming Simulator 25')
+      return { success: true, message: 'Simulation du lancement FS25' }
+    }
+  }
+
+  async function syncAllMods(
+    modNames: string[] = ['FS25_JohnDeere_7R.zip', 'FS25_Courseplay.zip', 'FS25_ClaasLexion8900.zip'],
+    serverId = 'server-1'
+  ) {
     if (state.value.syncInProgress) return
     if (!state.value.isConnected) {
       toastStore.error(
@@ -54,18 +99,21 @@ export const useCompanionStore = defineStore('companion', () => {
       return
     }
 
-    // If connected to real Rust companion via WebSocket, trigger native sync
-    if (socket && socket.readyState === WebSocket.OPEN) {
+    if (isTauri()) {
       state.value.syncInProgress = true
       state.value.syncProgress = 0
-      toastStore.info('Synchronisation démarrée', `Transfert et vérification SHA-256 via le client Rust...`)
-      socket.send(JSON.stringify({
-        type: 'sync_mods',
-        mod_names: modNames,
-      }))
+      toastStore.info('Synchronisation démarrée', 'Transfert et vérification SHA-256 via le client natif...')
+      try {
+        await invoke('sync_server', { serverId, modNames })
+      } catch (e) {
+        state.value.syncInProgress = false
+        state.value.currentSyncMod = null
+        toastStore.error('Erreur de synchronisation', String(e))
+      }
       return
     }
 
+    // Simulated fallback for browser demo or vitest
     state.value.syncInProgress = true
     state.value.syncProgress = 0
     toastStore.info('Synchronisation démarrée', `Vérification et transfert de ${modNames.length} mods...`)
@@ -83,76 +131,76 @@ export const useCompanionStore = defineStore('companion', () => {
     toastStore.success('Synchronisation terminée', 'Tous les mods sont à jour dans votre répertoire local FS25.')
   }
 
-  function tryRealWebSocketConnect() {
-    if (socket) {
-      socket.close()
-      socket = null
+  async function initTauriListeners() {
+    if (!isTauri()) {
+      return
     }
-    state.value.isConnecting = true
+
+    state.value.isConnected = true
+    state.value.simulationMode = false
+
     try {
-      socket = new WebSocket('ws://127.0.0.1:45823/ws')
-      socket.onopen = () => {
-        state.value.isConnected = true
-        state.value.isConnecting = false
-        state.value.simulationMode = false
-        toastStore.success('Liaison Rust IPC active', 'Connecté au client local natif.')
+      const initialState = await invoke<any>('get_companion_state')
+      if (initialState) {
+        state.value.isConnected = initialState.is_connected
+        state.value.version = initialState.version
+        state.value.os = initialState.os
+        state.value.modsPath = initialState.mods_path
+        state.value.syncInProgress = initialState.sync_in_progress
+        state.value.syncProgress = initialState.sync_progress
+        state.value.currentSyncMod = initialState.current_sync_mod
       }
-
-      socket.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data)
-          if (msg.type === 'state') {
-            state.value.isConnected = msg.is_connected
-            state.value.version = msg.version
-            state.value.os = msg.os
-            state.value.modsPath = msg.mods_path
-            state.value.syncInProgress = msg.sync_in_progress
-            state.value.syncProgress = msg.sync_progress
-            state.value.currentSyncMod = msg.current_sync_mod
-          } else if (msg.type === 'sync_started') {
-            state.value.syncInProgress = true
-            state.value.syncProgress = 0
-          } else if (msg.type === 'sync_progress') {
-            state.value.syncInProgress = true
-            state.value.syncProgress = msg.overall_progress
-            state.value.currentSyncMod = msg.file_name
-          } else if (msg.type === 'sync_completed') {
-            state.value.syncInProgress = false
-            state.value.currentSyncMod = null
-            state.value.lastSyncAt = msg.last_sync_at
-            if (msg.errors && msg.errors.length > 0) {
-              toastStore.warning('Synchronisation terminée avec alertes', `${msg.synced_count} mod(s) à jour, ${msg.failed_count} échec(s).`)
-            } else {
-              toastStore.success('Synchronisation terminée', `${msg.synced_count} mod(s) vérifiés et synchronisés.`)
-            }
-          } else if (msg.type === 'scan_result') {
-            toastStore.info('Scan terminé', `${msg.total_mods} mods locaux analysés (${(msg.total_size_bytes / (1024 * 1024)).toFixed(1)} MB).`)
-          } else if (msg.type === 'game_launched') {
-            if (msg.success) {
-              toastStore.success('Jeu lancé', msg.message)
-            } else {
-              toastStore.error('Erreur lancement jeu', msg.message)
-            }
-          } else if (msg.type === 'error') {
-            toastStore.error('Erreur Client Rust', msg.message)
-          }
-        } catch {
-          // ignore invalid message
-        }
-      }
-
-      socket.onerror = () => {
-        state.value.isConnecting = false
-        // Keep simulated mode active so user has functioning UI
-      }
-      socket.onclose = () => {
-        if (!state.value.simulationMode) {
-          state.value.isConnected = false
-        }
-      }
-    } catch {
-      state.value.isConnecting = false
+    } catch (e) {
+      console.warn('Impossible de récupérer l\'état initial du client Rust:', e)
     }
+
+    // Clean up previous listeners if any
+    for (const unlisten of unlisteners) {
+      unlisten()
+    }
+    unlisteners = []
+
+    try {
+      const unlistenProgress = await listen('sync_progress', (event) => {
+        const msg = event.payload as any
+        state.value.syncInProgress = true
+        state.value.syncProgress = msg.overall_progress
+        state.value.currentSyncMod = msg.file_name
+      })
+      unlisteners.push(unlistenProgress)
+
+      const unlistenCompleted = await listen('sync_completed', (event) => {
+        const msg = event.payload as any
+        state.value.syncInProgress = false
+        state.value.currentSyncMod = null
+        state.value.lastSyncAt = msg.last_sync_at
+        if (msg.errors && msg.errors.length > 0) {
+          toastStore.warning('Synchronisation terminée avec alertes', `${msg.synced_count} mod(s) à jour, ${msg.failed_count} échec(s).`)
+        } else {
+          toastStore.success('Synchronisation terminée', `${msg.synced_count} mod(s) vérifiés et synchronisés.`)
+        }
+      })
+      unlisteners.push(unlistenCompleted)
+
+      const unlistenScan = await listen('scan_result', (event) => {
+        const msg = event.payload as any
+        toastStore.info('Scan terminé', `${msg.total_mods} mods locaux analysés (${(msg.total_size_bytes / (1024 * 1024)).toFixed(1)} MB).`)
+      })
+      unlisteners.push(unlistenScan)
+
+      const unlistenError = await listen('error', (event) => {
+        const msg = event.payload as any
+        toastStore.error('Erreur Client Rust', msg.message)
+      })
+      unlisteners.push(unlistenError)
+    } catch (e) {
+      console.warn('Erreur lors de l\'enregistrement des listeners Tauri:', e)
+    }
+  }
+
+  // Backward compatibility alias for reconnection trigger
+  async function tryRealWebSocketConnect() {
+    await initTauriListeners()
   }
 
   return {
@@ -160,6 +208,9 @@ export const useCompanionStore = defineStore('companion', () => {
     toggleConnection,
     setModsPath,
     syncAllMods,
+    scanMods,
+    launchGame,
+    initTauriListeners,
     tryRealWebSocketConnect,
   }
 })

@@ -82,7 +82,7 @@ function downloadBinary(os: 'windows' | 'linux') {
       <!-- Quick status indicator -->
       <Badge :variant="companionStore.state.isConnected ? 'synced' : 'missing'">
         <Radio class="w-3.5 h-3.5" />
-        {{ companionStore.state.isConnected ? 'Client Rust connecté (port 45823)' : 'Client Rust non connecté' }}
+        {{ companionStore.state.isConnected ? 'Client Rust connecté (IPC Tauri)' : 'Client Rust non connecté' }}
       </Badge>
     </div>
 

@@ -45,10 +45,10 @@ const companionStore = useCompanionStore()
           </div>
           <div>
             <h3 class="text-sm font-bold uppercase tracking-wider text-foreground">
-              Pont App Compagnon Rust (IPC / WS)
+              Pont App Compagnon Rust (IPC Natif Tauri)
             </h3>
             <p class="text-xs text-muted font-mono">
-              ws://127.0.0.1:45823 &bull; Statut du connecteur natif
+              IPC Natif Tauri &bull; Statut du moteur desktop
             </p>
           </div>
         </div>
@@ -136,7 +136,7 @@ const companionStore = useCompanionStore()
         >
           <AlertTriangle class="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
           <span>
-            L'application cliente Rust ne répond pas sur <code class="font-mono bg-black/40 px-1 py-0.5">127.0.0.1:45823</code>. Assurez-vous qu'elle est lancée sur votre machine pour synchroniser vos mods d'un simple clic.
+            Le moteur Rust natif n'est pas actif via le bus IPC. En mode navigateur web standard, les synchronisations sont exécutées en simulation.
           </span>
         </div>
       </div>
@@ -155,11 +155,11 @@ const companionStore = useCompanionStore()
           <Button
             size="sm"
             variant="secondary"
-            @click="companionStore.tryRealWebSocketConnect"
+            @click="companionStore.initTauriListeners"
             :disabled="companionStore.state.isConnecting"
           >
             <RefreshCw :class="['w-3.5 h-3.5', companionStore.state.isConnecting ? 'animate-spin' : '']" />
-            Tester WS Local
+            Actualiser IPC
           </Button>
         </div>
 

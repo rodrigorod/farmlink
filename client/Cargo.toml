@@ -3,7 +3,7 @@ name = "farmlink-companion"
 version = "0.4.2"
 edition = "2021"
 authors = ["FarmLink Team"]
-description = "Native high-performance companion client for Farming Simulator 25 mod synchronization"
+description = "Native Tauri companion application for Farming Simulator 25 mod synchronization"
 license = "MIT"
 
 [lib]
@@ -15,10 +15,8 @@ name = "farmlink-companion"
 path = "src/main.rs"
 
 [dependencies]
+tauri = { version = "2", features = [] }
 tokio = { version = "1.43", features = ["full"] }
-axum = { version = "0.8", features = ["ws"] }
-tower = "0.5"
-tower-http = { version = "0.6", features = ["cors", "trace"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
@@ -27,7 +25,6 @@ sha2 = "0.10"
 hex = "0.4"
 zip = "2.2"
 quick-xml = { version = "0.37", features = ["serialize"] }
-clap = { version = "4.5", features = ["derive"] }
 thiserror = "2.0"
 anyhow = "1.0"
 tracing = "0.1"
@@ -35,9 +32,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dirs = "6.0"
 tempfile = "3.17"
 
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
 [dev-dependencies]
 tokio-test = "0.4"
-tokio-tungstenite = "0.29"
 
 [lints.clippy]
 correctness = "deny"

@@ -69,6 +69,18 @@ describe('stores logic', () => {
     expect(companionStore.state.syncProgress).toBe(0)
   })
 
+  it('companion setModsPath and launchGame fallback gracefully in browser environment', async () => {
+    const companionStore = useCompanionStore()
+    await companionStore.setModsPath('/custom/fs25/mods')
+    expect(companionStore.state.modsPath).toBe('/custom/fs25/mods')
+
+    const res = await companionStore.launchGame('farmlink://join?server=s1')
+    expect(res.success).toBe(true)
+
+    const scan = await companionStore.scanMods()
+    expect(Array.isArray(scan)).toBe(true)
+  })
+
   it('filters servers by name, address and TLD zone', () => {
     const serversStore = useServersStore()
     const filter = (q: string, tld = 'all') => {

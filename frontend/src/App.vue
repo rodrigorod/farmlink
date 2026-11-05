@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Navbar from '@/components/layout/Navbar.vue'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
 import { Tractor } from 'lucide-vue-next'
+import { useCompanionStore } from '@/stores/companion'
 
 const route = useRoute()
 const isAuthRoute = computed(() => route.path === '/auth')
+const companionStore = useCompanionStore()
+
+onMounted(() => {
+  companionStore.initTauriListeners()
+})
 </script>
 
 <template>

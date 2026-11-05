@@ -1,6 +1,9 @@
 # Rust
 client/target/
 **/target/
+client/.cargo/
+client/.pkgconfig/
+client/gen/
 
 # Node / Frontend
 frontend/node_modules/

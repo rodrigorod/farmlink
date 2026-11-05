@@ -1,8 +1,9 @@
 //! FarmLink Client Library
 //!
 //! Provides modpack scanning, cryptographic verification, fast asynchronous synchronization,
-//! and local WebSocket / IPC services for Farming Simulator 25.
+//! and native Tauri IPC command services for Farming Simulator 25.
 
+pub mod commands;
 pub mod config;
 pub mod downloader;
 pub mod error;
@@ -10,8 +11,8 @@ pub mod fs25;
 pub mod launcher;
 pub mod manifest;
 pub mod protocol;
-pub mod server;
 
+pub use commands::AppState;
 pub use config::Config;
 pub use downloader::{DownloadProgressEvent, DownloadSummary, ModDownloader};
 pub use error::{ClientError, Result};
@@ -20,7 +21,8 @@ pub use launcher::{launch_fs25, parse_join_url, JoinUrlParams};
 pub use manifest::{
     compute_manifest_diff, fetch_manifest, ManifestDiff, ManifestModDto, ManifestResponse,
 };
-pub use protocol::{ClientMessage, CompanionState, LocalModSummary, ServerMessage};
-pub use server::{create_router, run_server, AppState};
+pub use protocol::{
+    CompanionState, LocalModSummary, ScanResultPayload, SyncCompletedPayload, SyncProgressPayload,
+};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -64,18 +64,13 @@ function copyAddress(address: string) {
   toastStore.success('Adresse copiée', `L'adresse IP "${address}" a été copiée dans le presse-papier.`)
 }
 
-function joinServer(server: any) {
+async function joinServer(server: any) {
   if (companionStore.state.isConnected) {
-    toastStore.success(
+    toastStore.info(
       'Lancement via Rust Compagnon',
       `Ouverture de Farming Simulator 25 et connexion directe à "${server.name}" (${server.address})...`
     )
-    // Trigger native companion protocol safely without navigating the current page
-    const iframe = document.createElement('iframe')
-    iframe.style.display = 'none'
-    iframe.src = `farmlink://join?server=${server.id}&addr=${encodeURIComponent(server.address)}`
-    document.body.appendChild(iframe)
-    setTimeout(() => iframe.remove(), 2000)
+    await companionStore.launchGame(`farmlink://join?server=${server.id}&addr=${encodeURIComponent(server.address)}`)
   } else {
     copyAddress(server.address)
     toastStore.warning(
