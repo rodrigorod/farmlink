@@ -56,7 +56,4 @@ CREATE TABLE IF NOT EXISTS server_mods (
     PRIMARY KEY (server_id, mod_id)
 );
 
--- Index pour accélérer la recherche par hash (utilisé par l'app Rust)
-CREATE INDEX IF NOT EXISTS idx_mods_hash ON mods(hash_sha256);
-
 

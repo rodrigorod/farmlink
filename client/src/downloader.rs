@@ -213,73 +213,80 @@ async fn download_single_mod_verified(
         mod_dto.file_name, mod_dto.download_url
     );
 
-    let response = client.get(&mod_dto.download_url).send().await?;
-    let status = response.status();
-    if !status.is_success() {
-        return Err(ClientError::ServerApiError {
-            status: status.as_u16(),
-            message: format!("HTTP {} downloading mod", status),
-        });
-    }
-
-    let mut stream = response.bytes_stream();
-    let mut file = File::create(&temp_destination).await?;
-    let mut hasher = Sha256::new();
-    let mut downloaded_bytes = 0u64;
-
-    while let Some(chunk_res) = stream.next().await {
-        let chunk = chunk_res?;
-        file.write_all(&chunk).await?;
-        hasher.update(&chunk);
-
-        let chunk_len = chunk.len() as u64;
-        downloaded_bytes += chunk_len;
-        let cur_overall = overall_downloaded.fetch_add(chunk_len, Ordering::Relaxed) + chunk_len;
-
-        if let Some(tx) = progress_tx {
-            let pct = if overall_total > 0 {
-                ((cur_overall as f64) / (overall_total as f64) * 100.0).clamp(0.0, 100.0)
-            } else {
-                100.0
-            };
-
-            let _ = tx
-                .send(DownloadProgressEvent::Progress {
-                    file_name: mod_dto.file_name.clone(),
-                    mod_name: mod_dto.mod_name.clone(),
-                    downloaded_bytes,
-                    file_size_bytes: mod_dto.file_size_bytes,
-                    overall_downloaded_bytes: cur_overall,
-                    overall_total_bytes: overall_total,
-                    overall_percentage: pct,
-                })
-                .await;
+    let res = async {
+        let response = client.get(&mod_dto.download_url).send().await?;
+        let status = response.status();
+        if !status.is_success() {
+            return Err(ClientError::ServerApiError {
+                status: status.as_u16(),
+                message: format!("HTTP {} downloading mod", status),
+            });
         }
+
+        let mut stream = response.bytes_stream();
+        let mut file = File::create(&temp_destination).await?;
+        let mut hasher = Sha256::new();
+        let mut downloaded_bytes = 0u64;
+
+        while let Some(chunk_res) = stream.next().await {
+            let chunk = chunk_res?;
+            file.write_all(&chunk).await?;
+            hasher.update(&chunk);
+
+            let chunk_len = chunk.len() as u64;
+            downloaded_bytes += chunk_len;
+            let cur_overall = overall_downloaded.fetch_add(chunk_len, Ordering::Relaxed) + chunk_len;
+
+            if let Some(tx) = progress_tx {
+                let pct = if overall_total > 0 {
+                    ((cur_overall as f64) / (overall_total as f64) * 100.0).clamp(0.0, 100.0)
+                } else {
+                    100.0
+                };
+
+                let _ = tx
+                    .send(DownloadProgressEvent::Progress {
+                        file_name: mod_dto.file_name.clone(),
+                        mod_name: mod_dto.mod_name.clone(),
+                        downloaded_bytes,
+                        file_size_bytes: mod_dto.file_size_bytes,
+                        overall_downloaded_bytes: cur_overall,
+                        overall_total_bytes: overall_total,
+                        overall_percentage: pct,
+                    })
+                    .await;
+            }
+        }
+
+        file.flush().await?;
+        drop(file);
+
+        // Cryptographic validation
+        let computed_hash = hex::encode(hasher.finalize());
+        if !computed_hash.eq_ignore_ascii_case(&mod_dto.hash_sha256) {
+            return Err(ClientError::HashMismatch {
+                file: mod_dto.file_name.clone(),
+                expected: mod_dto.hash_sha256.clone(),
+                actual: computed_hash,
+            });
+        }
+
+        // Atomic move to target filename
+        fs::rename(&temp_destination, destination).await?;
+        info!(
+            "successfully downloaded and verified '{}' (SHA256: {})",
+            mod_dto.file_name, computed_hash
+        );
+
+        Ok(())
     }
+    .await;
 
-    file.flush().await?;
-    drop(file);
-
-    // Cryptographic validation
-    let computed_hash = hex::encode(hasher.finalize());
-    if !computed_hash.eq_ignore_ascii_case(&mod_dto.hash_sha256) {
-        // Clean up corrupt temporary file
+    if res.is_err() {
         let _ = fs::remove_file(&temp_destination).await;
-        return Err(ClientError::HashMismatch {
-            file: mod_dto.file_name.clone(),
-            expected: mod_dto.hash_sha256.clone(),
-            actual: computed_hash,
-        });
     }
 
-    // Atomic move to target filename
-    fs::rename(&temp_destination, destination).await?;
-    info!(
-        "successfully downloaded and verified '{}' (SHA256: {})",
-        mod_dto.file_name, computed_hash
-    );
-
-    Ok(())
+    res
 }
 
 #[cfg(test)]

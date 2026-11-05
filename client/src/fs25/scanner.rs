@@ -246,15 +246,23 @@ pub fn extract_mod_desc_from_zip(path: &Path) -> Result<ModDesc> {
     let file = File::open(path)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
-    // Locate modDesc.xml index
+    // Locate modDesc.xml index, prioritizing root
     let mut target_index = None;
     for i in 0..archive.len() {
         if let Ok(entry) = archive.by_index(i) {
-            let name = entry.name().to_lowercase();
-            // Check if top-level or inside root dir
-            if name == "moddesc.xml" || name.ends_with("/moddesc.xml") {
+            if entry.name().eq_ignore_ascii_case("moddesc.xml") {
                 target_index = Some(i);
                 break;
+            }
+        }
+    }
+    if target_index.is_none() {
+        for i in 0..archive.len() {
+            if let Ok(entry) = archive.by_index(i) {
+                if entry.name().to_lowercase().ends_with("/moddesc.xml") {
+                    target_index = Some(i);
+                    break;
+                }
             }
         }
     }

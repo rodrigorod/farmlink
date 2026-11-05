@@ -88,8 +88,8 @@ func (h *ModHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.Role != "admin" && ownerID.String() != claims.UserID {
-		http.Error(w, `{"error":"forbidden: only server owner or admin can upload mods"}`, http.StatusForbidden)
+	if ownerID.String() != claims.UserID {
+		http.Error(w, `{"error":"forbidden: only the server owner can upload mods"}`, http.StatusForbidden)
 		return
 	}
 
@@ -159,12 +159,20 @@ func (h *ModHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find modDesc.xml case-insensitively
+	// Find modDesc.xml case-insensitively, prioritizing top-level root
 	var modDescFile *zip.File
 	for _, f := range zipReader.File {
-		if strings.EqualFold(filepath.Base(f.Name), "moddesc.xml") {
+		if strings.EqualFold(f.Name, "moddesc.xml") {
 			modDescFile = f
 			break
+		}
+	}
+	if modDescFile == nil {
+		for _, f := range zipReader.File {
+			if strings.EqualFold(filepath.Base(f.Name), "moddesc.xml") {
+				modDescFile = f
+				break
+			}
 		}
 	}
 
@@ -214,6 +222,20 @@ func (h *ModHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if this mod was already registered (to avoid deleting another server's S3 file on failure)
+	var existedBefore bool
+	_ = h.db.QueryRow(r.Context(), "SELECT EXISTS(SELECT 1 FROM mods WHERE hash_sha256 = $1)", hashSHA256).Scan(&existedBefore)
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		if !existedBefore {
+			_ = h.storage.Delete(r.Context(), s3Key)
+		}
+		http.Error(w, `{"error":"database transaction error"}`, http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
 	// Database upsert into mods
 	var uploaderUUID *uuid.UUID
 	if uid, err := uuid.Parse(claims.UserID); err == nil {
@@ -221,7 +243,7 @@ func (h *ModHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var modID uuid.UUID
-	err = h.db.QueryRow(r.Context(),
+	err = tx.QueryRow(r.Context(),
 		`INSERT INTO mods (mod_name, file_name, version, hash_sha256, file_size_bytes, s3_key, uploaded_by)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (hash_sha256) DO UPDATE 
@@ -230,21 +252,30 @@ func (h *ModHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		modName, fileName, version, hashSHA256, sizeBytes, s3Key, uploaderUUID,
 	).Scan(&modID)
 	if err != nil {
-		_ = h.storage.Delete(r.Context(), s3Key)
+		if !existedBefore {
+			_ = h.storage.Delete(r.Context(), s3Key)
+		}
 		http.Error(w, `{"error":"recording mod in database"}`, http.StatusInternalServerError)
 		return
 	}
 
 	// Associate with server in server_mods
-	_, err = h.db.Exec(r.Context(),
+	_, err = tx.Exec(r.Context(),
 		`INSERT INTO server_mods (server_id, mod_id, is_active)
 		 VALUES ($1, $2, true)
 		 ON CONFLICT (server_id, mod_id) DO UPDATE SET is_active = true`,
 		serverID, modID,
 	)
 	if err != nil {
-		_ = h.storage.Delete(r.Context(), s3Key)
+		if !existedBefore {
+			_ = h.storage.Delete(r.Context(), s3Key)
+		}
 		http.Error(w, `{"error":"associating mod with server modpack"}`, http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		http.Error(w, `{"error":"committing modpack association"}`, http.StatusInternalServerError)
 		return
 	}
 

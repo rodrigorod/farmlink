@@ -128,32 +128,23 @@ pub fn compute_manifest_diff(manifest: &ManifestResponse, local_mods: &[LocalMod
             continue;
         }
 
-        // Try exact hash match first
-        if let Some((idx, _)) = local_mods
-            .iter()
-            .enumerate()
-            .find(|(_, l)| l.hash_sha256.eq_ignore_ascii_case(&remote_mod.hash_sha256))
-        {
-            synced.push(remote_mod.clone());
-            matched_local_indices.insert(idx);
-            continue;
-        }
-
-        // Try file name match (indicates an outdated or modified version)
-        if let Some((idx, _)) = local_mods
+        // Match local mod by file name
+        if let Some((idx, local_mod)) = local_mods
             .iter()
             .enumerate()
             .find(|(_, l)| l.file_name.eq_ignore_ascii_case(&remote_mod.file_name))
         {
-            outdated.push(remote_mod.clone());
-            total_download_bytes += remote_mod.file_size_bytes;
             matched_local_indices.insert(idx);
-            continue;
+            if local_mod.hash_sha256.eq_ignore_ascii_case(&remote_mod.hash_sha256) {
+                synced.push(remote_mod.clone());
+            } else {
+                outdated.push(remote_mod.clone());
+                total_download_bytes += remote_mod.file_size_bytes;
+            }
+        } else {
+            missing.push(remote_mod.clone());
+            total_download_bytes += remote_mod.file_size_bytes;
         }
-
-        // Neither hash nor filename match: missing mod
-        missing.push(remote_mod.clone());
-        total_download_bytes += remote_mod.file_size_bytes;
     }
 
     // Local mods not referenced in the manifest are considered extra

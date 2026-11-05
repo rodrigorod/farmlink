@@ -390,7 +390,7 @@ export const useServersStore = defineStore('servers', () => {
     const outdatedOrMissing = list.filter((m) => m.status !== 'synced')
     const names = outdatedOrMissing.length > 0 ? outdatedOrMissing.map((m) => m.fileName) : list.map((m) => m.fileName)
     
-    await companionStore.syncAllMods(names)
+    await companionStore.syncAllMods(names, serverId)
     
     // Update local statuses to synced
     list.forEach((m) => {

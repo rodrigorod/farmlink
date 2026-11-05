@@ -32,7 +32,6 @@ const routes = [
     path: '/servers/:id/admin',
     name: 'server-admin',
     component: ServerAdminView,
-    meta: { requiresAdmin: true },
   },
   {
     path: '/settings',

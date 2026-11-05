@@ -69,13 +69,16 @@ export const useCompanionStore = defineStore('companion', () => {
   async function launchGame(target = 'auto') {
     if (isTauri()) {
       try {
-        const res = await invoke<{ success: boolean; message: string }>('launch_game', { target })
-        if (res.success) {
-          toastStore.success('Jeu lancé', res.message)
+        const res = await invoke<any>('launch_game', { target })
+        const message = typeof res === 'string' ? res : res?.message || 'Farming Simulator 25 lancé'
+        const isSuccess = typeof res === 'string' ? true : res?.success !== false
+        if (isSuccess) {
+          toastStore.success('Jeu lancé', message)
+          return { success: true, message }
         } else {
-          toastStore.error('Erreur lancement', res.message)
+          toastStore.error('Erreur lancement', message)
+          return { success: false, message }
         }
-        return res
       } catch (e) {
         toastStore.error('Erreur', String(e))
         return { success: false, message: String(e) }

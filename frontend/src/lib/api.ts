@@ -18,7 +18,9 @@ export async function apiFetch<T>(
     : `http://localhost:8088${endpoint}`
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 1500)
+  // Uploads get 5 min; regular requests timeout after 1.5s to allow fast offline fallback
+  const timeoutMs = options.body instanceof FormData ? 300_000 : 1500
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const res = await fetch(url, {
@@ -29,7 +31,9 @@ export async function apiFetch<T>(
 
     if (!res.ok) {
       const errorBody = await res.json().catch(() => ({ error: res.statusText }))
-      throw new Error(errorBody.error || `HTTP error ${res.status}`)
+      const err: any = new Error(errorBody.error || `HTTP error ${res.status}`)
+      err.status = res.status
+      throw err
     }
 
     if (res.status === 204) {

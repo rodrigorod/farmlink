@@ -69,16 +69,18 @@ func (h *ServerHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	if claims != nil && claims.Role != "admin" {
 		userUUID, err := uuid.Parse(claims.UserID)
-		if err == nil {
-			query = `SELECT s.id, s.name, COALESCE(s.ip_address, ''), s.port, s.invite_code, s.owner_id, s.created_at,
-					        COUNT(sm.mod_id) FILTER (WHERE sm.is_active = true) as mod_count
-					 FROM servers s
-					 LEFT JOIN server_mods sm ON s.id = sm.server_id
-					 WHERE s.owner_id = $1 OR EXISTS (SELECT 1 FROM server_members sm2 WHERE sm2.server_id = s.id AND sm2.user_id = $1)
-					 GROUP BY s.id
-					 ORDER BY s.created_at DESC`
-			args = append(args, userUUID)
+		if err != nil {
+			http.Error(w, `{"error":"invalid user id in token"}`, http.StatusUnauthorized)
+			return
 		}
+		query = `SELECT s.id, s.name, COALESCE(s.ip_address, ''), s.port, s.invite_code, s.owner_id, s.created_at,
+				        COUNT(sm.mod_id) FILTER (WHERE sm.is_active = true) as mod_count
+				 FROM servers s
+				 LEFT JOIN server_mods sm ON s.id = sm.server_id
+				 WHERE s.owner_id = $1 OR EXISTS (SELECT 1 FROM server_members sm2 WHERE sm2.server_id = s.id AND sm2.user_id = $1)
+				 GROUP BY s.id
+				 ORDER BY s.created_at DESC`
+		args = append(args, userUUID)
 	}
 
 	if query == "" {

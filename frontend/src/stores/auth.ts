@@ -35,7 +35,11 @@ export const useAuthStore = defineStore('auth', () => {
       localStorage.setItem('farmlink_jwt', res.token)
       localStorage.setItem('farmlink_role', user.value.role)
       return res
-    } catch {
+    } catch (err: any) {
+      // Re-throw genuine authentication errors (401/400/403) from active backend
+      if (err?.status && (err.status === 400 || err.status === 401 || err.status === 403)) {
+        throw err
+      }
       // Fallback to local demo mode if backend is offline or during testing
       token.value = `jwt_${Date.now()}_mock`
       user.value = {

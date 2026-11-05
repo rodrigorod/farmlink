@@ -77,6 +77,15 @@ pub fn launch_fs25(server_address: Option<&str>) -> Result<()> {
         server_address
     );
 
+    // Validate server address to prevent command/protocol injection
+    if let Some(addr) = server_address {
+        if !addr.chars().all(|c| c.is_alphanumeric() || matches!(c, '.' | '-' | '_' | ':')) {
+            return Err(ClientError::GameLaunchFailed(
+                "invalid characters in server address".to_string(),
+            ));
+        }
+    }
+
     #[cfg(target_os = "windows")]
     {
         let steam_target = match server_address {
@@ -85,7 +94,7 @@ pub fn launch_fs25(server_address: Option<&str>) -> Result<()> {
         };
 
         Command::new("cmd")
-            .args(["/C", "start", &steam_target])
+            .args(["/C", "start", "", &steam_target])
             .spawn()
             .map_err(|e| ClientError::GameLaunchFailed(format!("failed spawning process: {e}")))?;
         return Ok(());
@@ -160,5 +169,11 @@ mod tests {
     fn ignores_invalid_scheme() {
         assert!(parse_join_url("https://google.com").is_none());
         assert!(parse_join_url("steam://run/2300320").is_none());
+    }
+
+    #[test]
+    fn rejects_malicious_server_address() {
+        let bad = launch_fs25(Some("127.0.0.1:10823 & calc.exe"));
+        assert!(bad.is_err());
     }
 }
