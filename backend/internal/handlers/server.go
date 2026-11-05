@@ -198,13 +198,11 @@ func (h *ServerHandler) RemoveMod(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.Role != "admin" {
-		var ownerID uuid.UUID
-		err := h.db.QueryRow(r.Context(), "SELECT owner_id FROM servers WHERE id = $1", serverID).Scan(&ownerID)
-		if err != nil || ownerID.String() != claims.UserID {
-			http.Error(w, `{"error":"forbidden: only server owner or admin can remove mods"}`, http.StatusForbidden)
-			return
-		}
+	var ownerID uuid.UUID
+	err = h.db.QueryRow(r.Context(), "SELECT owner_id FROM servers WHERE id = $1", serverID).Scan(&ownerID)
+	if err != nil || ownerID.String() != claims.UserID {
+		http.Error(w, `{"error":"forbidden: only the server owner can remove mods"}`, http.StatusForbidden)
+		return
 	}
 
 	result, err := h.db.Exec(r.Context(),
@@ -244,13 +242,11 @@ func (h *ServerHandler) ToggleMod(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.Role != "admin" {
-		var ownerID uuid.UUID
-		err := h.db.QueryRow(r.Context(), "SELECT owner_id FROM servers WHERE id = $1", serverID).Scan(&ownerID)
-		if err != nil || ownerID.String() != claims.UserID {
-			http.Error(w, `{"error":"forbidden: only server owner or admin can modify mods"}`, http.StatusForbidden)
-			return
-		}
+	var ownerID uuid.UUID
+	err = h.db.QueryRow(r.Context(), "SELECT owner_id FROM servers WHERE id = $1", serverID).Scan(&ownerID)
+	if err != nil || ownerID.String() != claims.UserID {
+		http.Error(w, `{"error":"forbidden: only the server owner can modify mods"}`, http.StatusForbidden)
+		return
 	}
 
 	var req struct {

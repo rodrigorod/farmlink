@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useServersStore } from '@/stores/servers'
 import { useCompanionStore } from '@/stores/companion'
 import { useToastStore } from '@/stores/toast'
-import { useAuthStore } from '@/stores/auth'
 import { formatBytes, formatDate } from '@/lib/utils'
 import {
   Server as ServerIcon,
@@ -26,7 +25,6 @@ import GeometricSkeleton from '@/components/ui/GeometricSkeleton.vue'
 const serversStore = useServersStore()
 const companionStore = useCompanionStore()
 const toastStore = useToastStore()
-const authStore = useAuthStore()
 
 const isLoading = ref(true)
 const searchQuery = ref('')
@@ -284,14 +282,14 @@ async function joinServer(server: any) {
               </Button>
             </router-link>
 
-            <!-- Admin Button if user is Admin or Server Owner -->
+            <!-- Admin Button only if user is Server Owner -->
             <router-link
-              v-if="authStore.isAdmin || server.isOwner"
+              v-if="server.isOwner"
               :to="`/servers/${server.id}/admin`"
             >
               <Button size="sm" variant="outline" class="border-purple-800/80 text-purple-300 hover:bg-purple-950/40">
                 <Shield class="w-3.5 h-3.5" />
-                Gérer le Manifeste (Admin)
+                Gérer le Manifeste (Propriétaire)
               </Button>
             </router-link>
           </div>

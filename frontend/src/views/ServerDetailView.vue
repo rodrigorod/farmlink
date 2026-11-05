@@ -4,7 +4,6 @@ import { useRoute } from 'vue-router'
 import { useServersStore } from '@/stores/servers'
 import { useCompanionStore } from '@/stores/companion'
 import { useToastStore } from '@/stores/toast'
-import { useAuthStore } from '@/stores/auth'
 import { formatBytes } from '@/lib/utils'
 import {
   DownloadCloud,
@@ -25,7 +24,6 @@ const route = useRoute()
 const serversStore = useServersStore()
 const companionStore = useCompanionStore()
 const toastStore = useToastStore()
-const authStore = useAuthStore()
 
 const serverId = computed(() => route.params.id as string)
 const server = serversStore.getServerById(serverId.value)
@@ -85,12 +83,12 @@ function copyHash(hash: string) {
       </router-link>
 
       <router-link
-        v-if="authStore.isAdmin || server.isOwner"
+        v-if="server.isOwner"
         :to="`/servers/${server.id}/admin`"
       >
         <Button size="sm" variant="outline" class="border-purple-800 text-purple-300 hover:bg-purple-950/40">
           <Shield class="w-3.5 h-3.5" />
-          Passer en mode Administration
+          Gérer le Manifeste (Propriétaire)
         </Button>
       </router-link>
     </div>

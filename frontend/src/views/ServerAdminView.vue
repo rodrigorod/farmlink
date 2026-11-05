@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useServersStore } from '@/stores/servers'
 import { useToastStore } from '@/stores/toast'
-import { useAuthStore } from '@/stores/auth'
 import { formatBytes } from '@/lib/utils'
 import {
   ShieldAlert,
@@ -24,7 +23,6 @@ import Dropzone from '@/components/ui/Dropzone.vue'
 const route = useRoute()
 const serversStore = useServersStore()
 const toastStore = useToastStore()
-const authStore = useAuthStore()
 
 const serverId = computed(() => route.params.id as string)
 const server = serversStore.getServerById(serverId.value)
@@ -38,24 +36,41 @@ onMounted(async () => {
 const newVersionInput = ref('')
 
 function handleFileUpload(file: File | { name: string; size: number }) {
+  if (!server.value?.isOwner) {
+    toastStore.error('Action refusée', 'Seul le propriétaire de ce serveur peut ajouter des mods.')
+    return
+  }
   serversStore.uploadModZip(serverId.value, file)
 }
 
 function handleToggleEnable(modId: string) {
+  if (!server.value?.isOwner) {
+    toastStore.error('Action refusée', 'Seul le propriétaire de ce serveur peut modifier les mods.')
+    return
+  }
   serversStore.toggleModEnabled(serverId.value, modId)
 }
 
 function handleDeleteMod(modId: string) {
+  if (!server.value?.isOwner) {
+    toastStore.error('Action refusée', 'Seul le propriétaire de ce serveur peut supprimer des mods.')
+    return
+  }
   if (confirm('Êtes-vous sûr de vouloir retirer ce mod du manifeste du serveur ?')) {
     serversStore.deleteMod(serverId.value, modId)
   }
 }
 
 function handleReorder(modId: string, direction: 'up' | 'down') {
+  if (!server.value?.isOwner) return
   serversStore.moveModOrder(serverId.value, modId, direction)
 }
 
 function handleBumpVersion() {
+  if (!server.value?.isOwner) {
+    toastStore.error('Action refusée', 'Seul le propriétaire de ce serveur peut publier une nouvelle version.')
+    return
+  }
   if (!newVersionInput.value.trim()) {
     toastStore.warning('Format invalide', 'Veuillez saisir une version valide (ex: v2.5.0).')
     return
@@ -92,30 +107,37 @@ function autoIncrementVersion() {
       </router-link>
 
       <div class="flex items-center gap-2">
-        <Badge variant="admin">
+        <Badge :variant="server.isOwner ? 'admin' : 'missing'">
           <ShieldCheck class="w-3.5 h-3.5" />
-          Accès Administrateur / Propriétaire
+          {{ server.isOwner ? 'Propriétaire du Serveur' : 'Accès Non Autorisé' }}
         </Badge>
       </div>
     </div>
 
-    <!-- Admin Warning if role is not admin -->
+    <!-- Access Denied Card if not server owner -->
     <div
-      v-if="!authStore.isAdmin && !server.isOwner"
-      class="p-4 bg-amber-950/40 border border-amber-800 text-amber-300 text-xs flex items-center justify-between"
+      v-if="!server.isOwner"
+      class="industrial-panel p-8 bg-surface border border-destructive/50 text-center flex flex-col items-center justify-center gap-3"
     >
-      <div class="flex items-center gap-2">
-        <ShieldAlert class="w-5 h-5 text-amber-400 shrink-0" />
-        <span>
-          Attention : Vous visualisez ce panneau avec le rôle <strong>Joueur</strong>. Utilisez le bouton en haut à droite pour basculer en rôle <strong>Admin</strong>.
-        </span>
+      <div class="w-12 h-12 rounded-full bg-destructive/10 border border-destructive/40 flex items-center justify-center text-destructive">
+        <ShieldAlert class="w-6 h-6" />
       </div>
-      <Button size="sm" variant="accent" @click="authStore.setRole('admin')">
-        Activer Rôle Admin
-      </Button>
+      <h2 class="text-base font-bold uppercase tracking-wider text-foreground">
+        Accès Réservé au Propriétaire
+      </h2>
+      <p class="text-xs text-muted max-w-md">
+        Vous n'êtes pas le propriétaire du serveur <strong>{{ server.name }}</strong>. Seul le propriétaire peut téléverser de nouveaux mods, modifier les statuts d'activation ou publier des versions de manifeste.
+      </p>
+      <router-link :to="`/servers/${server.id}`" class="mt-2">
+        <Button size="sm" variant="secondary">
+          <ArrowLeft class="w-4 h-4" />
+          Retour à la vue joueur
+        </Button>
+      </router-link>
     </div>
 
-    <!-- Header Section -->
+    <template v-else>
+      <!-- Header Section -->
     <div class="industrial-panel p-6 bg-surface flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div>
         <div class="flex items-center gap-3">
@@ -302,5 +324,6 @@ function autoIncrementVersion() {
         </div>
       </div>
     </div>
-  </div>
+  </template>
+</div>
 </template>

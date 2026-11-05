@@ -7,25 +7,17 @@ import {
   Tractor,
   Layers,
   Settings,
-  Shield,
-  Radio,
   LogOut,
   ChevronDown,
+  RefreshCw,
 } from 'lucide-vue-next'
-import CompanionModal from '@/components/ui/CompanionModal.vue'
 
 const authStore = useAuthStore()
 const companionStore = useCompanionStore()
 const router = useRouter()
 const route = useRoute()
 
-const isCompanionModalOpen = ref(false)
 const isUserMenuOpen = ref(false)
-
-function toggleRole() {
-  const newRole = authStore.user.role === 'admin' ? 'player' : 'admin'
-  authStore.setRole(newRole)
-}
 
 function handleLogout() {
   authStore.logout()
@@ -83,59 +75,24 @@ function handleLogout() {
             ]"
           >
             <Settings class="w-3.5 h-3.5" />
-            App Compagnon Rust
+            Paramètres
           </router-link>
         </nav>
       </div>
 
-      <!-- Right: Companion Status LED + Role Switcher + User Profile -->
+      <!-- Right: Sync status & User Menu -->
       <div class="flex items-center gap-3">
-        <!-- Rust Companion App Permanent Indicator -->
-        <button
-          type="button"
-          @click="isCompanionModalOpen = true"
-          :class="[
-            'px-2.5 py-1.5 rounded-sm border text-xs font-mono flex items-center gap-2 transition-all',
-            companionStore.state.isConnected
-              ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-400 hover:bg-emerald-950/70'
-              : 'bg-red-950/40 border-red-800/80 text-red-400 hover:bg-red-950/70',
-          ]"
-          title="Cliquez pour afficher les détails du pont Rust compagnon"
+        <!-- Live Sync Progress Indicator if syncing -->
+        <div
+          v-if="companionStore.state.syncInProgress"
+          class="px-2.5 py-1 rounded-sm bg-primary/10 border border-primary/30 text-primary text-xs font-mono flex items-center gap-2"
         >
-          <span class="relative flex h-2 w-2">
-            <span
-              v-if="companionStore.state.isConnected"
-              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
-            ></span>
-            <span
-              :class="[
-                'relative inline-flex rounded-full h-2 w-2',
-                companionStore.state.isConnected ? 'bg-primary' : 'bg-red-500',
-              ]"
-            ></span>
+          <RefreshCw class="w-3.5 h-3.5 animate-spin" />
+          <span class="font-bold">{{ companionStore.state.syncProgress }}%</span>
+          <span v-if="companionStore.state.currentSyncMod" class="hidden xl:inline text-[11px] text-muted truncate max-w-[120px]">
+            {{ companionStore.state.currentSyncMod }}
           </span>
-          <Radio class="w-3.5 h-3.5" />
-          <span class="hidden sm:inline font-semibold tracking-wide">
-            {{ companionStore.state.isConnected ? 'RUST CLIENT : ACTIF' : 'RUST CLIENT : HORS-LIGNE' }}
-          </span>
-        </button>
-
-        <!-- Role Switcher (Admin vs Player) for fast evaluation & testing -->
-        <button
-          type="button"
-          @click="toggleRole"
-          :class="[
-            'px-2 py-1 text-xs font-mono font-bold rounded-sm border uppercase tracking-wider transition-colors flex items-center gap-1.5',
-            authStore.isAdmin
-              ? 'bg-purple-950/60 text-purple-300 border-purple-800/80 hover:bg-purple-900/60'
-              : 'bg-surface-raised text-muted border-surface-border hover:bg-surface-hover hover:text-foreground',
-          ]"
-          title="Cliquez pour basculer rapidement entre Joueur et Administrateur"
-        >
-          <Shield class="w-3.5 h-3.5 text-purple-400" />
-          <span class="hidden sm:inline text-[11px]">Rôle:</span>
-          <span>{{ authStore.user.role }}</span>
-        </button>
+        </div>
 
         <!-- User Menu Dropdown -->
         <div class="relative">
@@ -147,7 +104,7 @@ function handleLogout() {
             <div class="w-7 h-7 bg-surface border border-surface-border flex items-center justify-center text-primary font-bold text-xs rounded-sm">
               {{ authStore.user.username.charAt(0) }}
             </div>
-            <span class="hidden lg:inline text-xs font-medium text-foreground">
+            <span class="hidden sm:inline text-xs font-medium text-foreground">
               {{ authStore.user.username }}
             </span>
             <ChevronDown class="w-3.5 h-3.5 text-muted" />
@@ -186,10 +143,4 @@ function handleLogout() {
       </div>
     </div>
   </header>
-
-  <!-- Modal for Rust companion status -->
-  <CompanionModal
-    :is-open="isCompanionModalOpen"
-    @close="isCompanionModalOpen = false"
-  />
 </template>
