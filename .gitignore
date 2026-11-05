@@ -1,0 +1,23 @@
+# Rust
+client/target/
+**/target/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+.npm/
+
+# Go
+backend/bin/
+*.exe
+*.test
+*.out
+
+# Config and Cache
+.env
+.env.local
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
