@@ -50,10 +50,10 @@ function regenerateToken() {
 }
 
 function downloadBinary(os: 'windows' | 'linux') {
-  const fileName = os === 'windows' ? 'farmlink-companion-v0.4.2-x86_64-pc-windows-msvc.exe' : 'farmlink-companion-v0.4.2-x86_64-unknown-linux-gnu.tar.gz'
+  const fileName = os === 'windows' ? 'FarmLink-x86_64.exe' : 'FarmLink-x86_64.AppImage'
   toastStore.success(
     'Téléchargement lancé',
-    `Téléchargement du binaire Rust natif pour ${os === 'windows' ? 'Windows' : 'Linux'} : ${fileName}`
+    `Téléchargement du binaire standalone pour ${os === 'windows' ? 'Windows (.exe direct)' : 'Linux (.AppImage)'} : ${fileName}`
   )
 }
 </script>
@@ -112,12 +112,12 @@ function downloadBinary(os: 'windows' | 'linux') {
               FarmLink Companion pour Windows
             </h3>
             <p class="text-xs text-muted mt-2 leading-relaxed">
-              Installeur autonome avec enregistrement automatique du protocole <code>farmlink://</code> pour rejoindre les serveurs en 1 clic.
+              Exécutable standalone portable direct (aucun installeur requis) avec support des liens <code>farmlink://</code> pour rejoindre les serveurs en 1 clic.
             </p>
           </div>
 
           <div class="mt-6 pt-4 border-t border-surface-border flex items-center justify-between">
-            <span class="text-xs font-mono text-muted">8.4 MB &bull; .exe</span>
+            <span class="text-xs font-mono text-muted">Standalone &bull; .exe</span>
             <Button size="sm" variant="primary" @click="downloadBinary('windows')">
               <Download class="w-4 h-4" />
               Télécharger pour Windows
@@ -138,12 +138,12 @@ function downloadBinary(os: 'windows' | 'linux') {
               FarmLink Companion pour Linux
             </h3>
             <p class="text-xs text-muted mt-2 leading-relaxed">
-              Archive binaire statique (glibc / musl) et AppImage. Détecte automatiquement les préfixes Proton et Steam.
+              Format portable autonome AppImage (.AppImage). Compatible toutes distributions Linux récentes et Steam Deck.
             </p>
           </div>
 
           <div class="mt-6 pt-4 border-t border-surface-border flex items-center justify-between">
-            <span class="text-xs font-mono text-muted">6.9 MB &bull; tar.gz</span>
+            <span class="text-xs font-mono text-muted">Standalone &bull; .AppImage</span>
             <Button size="sm" variant="outline" @click="downloadBinary('linux')">
               <Download class="w-4 h-4" />
               Télécharger pour Linux

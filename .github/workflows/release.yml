@@ -10,25 +10,9 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: client
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            binary_name: farmlink-companion
-            package_name: farmlink-companion-x86_64-unknown-linux-gnu.tar.gz
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary_name: farmlink-companion.exe
-            package_name: farmlink-companion-x86_64-pc-windows-msvc.zip
-
+  build-linux:
+    name: Build Linux (Standalone AppImage & Binary)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -45,40 +29,72 @@ jobs:
           npm run build
 
       - name: Install Linux dependencies
-        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev file squashfs-tools
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: x86_64-unknown-linux-gnu
 
-      - name: Build binary
-        run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Package Linux artifact
-        if: matrix.os == 'ubuntu-latest'
+      - name: Build Standalone AppImage and Binary
         run: |
-          cd target/${{ matrix.target }}/release
-          tar -czf ../../../${{ matrix.package_name }} ${{ matrix.binary_name }}
+          npx --prefix frontend tauri build --config client/tauri.conf.json --bundles appimage
 
-      - name: Package Windows artifact
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
+      - name: Prepare Linux Release Artifacts
         run: |
-          cd target/${{ matrix.target }}/release
-          Compress-Archive -Path ${{ matrix.binary_name }} -DestinationPath ../../../${{ matrix.package_name }}
+          mkdir -p artifacts
+          cp client/target/release/bundle/appimage/*.AppImage artifacts/FarmLink-x86_64.AppImage
+          cp client/target/release/farmlink-companion artifacts/FarmLink-linux-x86_64
+          chmod +x artifacts/FarmLink-x86_64.AppImage artifacts/FarmLink-linux-x86_64
 
-      - name: Upload artifact
+      - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.package_name }}
-          path: client/${{ matrix.package_name }}
+          name: release-linux
+          path: artifacts/*
+
+  build-windows:
+    name: Build Windows (Standalone .exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build Frontend Assets
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build Standalone Windows .exe
+        working-directory: client
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Prepare Windows Release Artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts
+          Copy-Item client/target/x86_64-pc-windows-msvc/release/farmlink-companion.exe -Destination artifacts/FarmLink-x86_64.exe
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: artifacts/*
 
   publish:
     name: Publish Release
-    needs: build
+    needs: [build-linux, build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
