@@ -13,6 +13,9 @@ import (
 //go:embed schema.sql
 var schemaSQL string
 
+//go:embed seeds.sql
+var seedsSQL string
+
 // NewPool initializes a connection pool to PostgreSQL.
 func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(connString)
@@ -40,12 +43,20 @@ func NewPool(ctx context.Context, connString string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Migrate executes the embedded schema DDL if tables do not exist.
-func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+// Migrate executes the embedded schema DDL and seeds dev records in non-production environments.
+func Migrate(ctx context.Context, pool *pgxpool.Pool, env string) error {
 	slog.Info("running database schema migration")
 	if _, err := pool.Exec(ctx, schemaSQL); err != nil {
 		return fmt.Errorf("executing schema migration: %w", err)
 	}
+
+	if env != "production" {
+		slog.Info("seeding development records")
+		if _, err := pool.Exec(ctx, seedsSQL); err != nil {
+			slog.Warn("seed execution skipped or already applied", "err", err)
+		}
+	}
+
 	slog.Info("database schema migration completed successfully")
 	return nil
 }

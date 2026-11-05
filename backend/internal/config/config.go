@@ -21,10 +21,14 @@ type Config struct {
 // Load reads configuration from environment variables with sensible defaults.
 func Load() *Config {
 	env := getEnv("ENV", "development")
-	jwtSecret := getEnv("JWT_SECRET", "farmlink-dev-secret-key-fs25")
+	jwtSecret := getEnv("JWT_SECRET", "")
 
-	if env == "production" && jwtSecret == "farmlink-dev-secret-key-fs25" {
-		panic("JWT_SECRET must be configured with a secure key in production")
+	if (env == "production" || env == "staging") && (jwtSecret == "" || jwtSecret == "farmlink-dev-secret-key-fs25") {
+		panic("JWT_SECRET must be configured with a secure key in production/staging")
+	}
+
+	if jwtSecret == "" {
+		jwtSecret = "farmlink-dev-secret-key-fs25"
 	}
 
 	s3Endpoint := getEnv("S3_ENDPOINT", "http://localhost:9000")

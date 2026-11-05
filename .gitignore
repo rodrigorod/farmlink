@@ -15,7 +15,8 @@ backend/bin/
 
 # Config and Cache
 .env
-.env.local
+.env.*
+!.env.example
 *.log
 
 # OS

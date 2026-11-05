@@ -20,7 +20,7 @@ const companionStore = useCompanionStore()
 const toastStore = useToastStore()
 
 const inputModsPath = ref(companionStore.state.modsPath)
-const apiToken = ref('flk_live_9a87f10b2c3d4e5f6a7b8c9d0e')
+const apiToken = ref('flk_demo_sample_token_for_local_client')
 const isCopied = ref(false)
 
 function savePath() {
@@ -45,7 +45,7 @@ function copyToken() {
 }
 
 function regenerateToken() {
-  apiToken.value = `flk_live_${Math.random().toString(36).substring(2, 12)}${Math.random().toString(36).substring(2, 12)}`
+  apiToken.value = `flk_demo_${Math.random().toString(36).substring(2, 12)}${Math.random().toString(36).substring(2, 12)}`
   toastStore.info('Nouveau jeton généré', 'Pensez à mettre à jour la configuration de votre client Rust.')
 }
 

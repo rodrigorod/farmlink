@@ -34,9 +34,13 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	if err := database.Migrate(ctx, dbPool); err != nil {
+	if err := database.Migrate(ctx, dbPool, cfg.Environment); err != nil {
 		slog.Error("schema migration failed", "err", err)
 		os.Exit(1)
+	}
+
+	if cfg.JWTSecret == "farmlink-dev-secret-key-fs25" {
+		slog.Warn("using default development JWT_SECRET; set a secure JWT_SECRET environment variable for production")
 	}
 
 	// Storage connection

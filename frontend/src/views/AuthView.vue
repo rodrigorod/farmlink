@@ -19,10 +19,10 @@ const authStore = useAuthStore()
 const toastStore = useToastStore()
 
 const isRegister = ref(false)
-const username = ref('Farmer_Alex')
-const email = ref('alex@farmlink.io')
-const password = ref('password123')
-const selectedRole = ref<UserRole>('admin')
+const username = ref('')
+const email = ref('')
+const password = ref('')
+const selectedRole = ref<UserRole>('player')
 
 async function handleSubmit() {
   if (!username.value.trim()) {

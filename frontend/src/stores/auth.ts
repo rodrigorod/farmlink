@@ -7,15 +7,15 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('farmlink_jwt'))
   
   const user = ref<User>({
-    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-    username: 'Farmer_Alex',
-    email: 'alex@farmlink.io',
-    role: (localStorage.getItem('farmlink_role') as UserRole) || 'admin',
+    id: '',
+    username: 'Guest',
+    email: '',
+    role: (localStorage.getItem('farmlink_role') as UserRole) || 'player',
     token: token.value || undefined,
   })
 
   const isAuthenticated = computed(() => !!token.value)
-  const isAdmin = computed(() => user.value?.role === 'admin')
+  const isAdmin = computed(() => isAuthenticated.value && user.value?.role === 'admin')
 
   function setRole(role: UserRole) {
     if (user.value) {
@@ -24,7 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function login(username: string, role: UserRole = 'player', password = 'password123') {
+  async function login(username: string, role: UserRole = 'player', password = '') {
     try {
       const res = await apiFetch<{ token: string; user: User }>('/api/v1/auth/login', {
         method: 'POST',
@@ -50,7 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(username: string, email: string, password = 'password123') {
+  async function register(username: string, email: string, password = '') {
     const res = await apiFetch<{ token: string; user: User }>('/api/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify({ username, email, password }),
@@ -63,21 +63,19 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function ensureAuth() {
-    if (!token.value || token.value.includes('mock')) {
-      // Auto-login with default seeded database admin
-      try {
-        await login('Farmer_Alex', 'admin', 'password123')
-      } catch {
-        // Silently keep fallback if backend starting
-      }
-    }
+    // shortcut: no auto-login with hardcoded credentials; visitors remain guests until login
   }
 
   function logout() {
     token.value = null
     localStorage.removeItem('farmlink_jwt')
     localStorage.removeItem('farmlink_role')
-    user.value.role = 'player'
+    user.value = {
+      id: '',
+      username: 'Guest',
+      email: '',
+      role: 'player',
+    }
   }
 
   return {
