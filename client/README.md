@@ -1,118 +1,140 @@
-# FarmLink Companion (Client Rust)
+# FarmLink Companion (Rust Client)
 
-Application compagnon native haute performance développée en **Rust (Edition 2021 / Rust 1.99+)** pour **Farming Simulator 25 (FS25)**.
-
-Elle gère la détection locale du dossier des mods, l'inspection cryptographique SHA-256, l'analyse des descripteurs `modDesc.xml`, la synchronisation asynchrone concurrente avec le backend Go / S3, et expose une interface IPC locale en WebSocket (`ws://127.0.0.1:45823/ws`) et HTTP REST pour l'application web frontend Vue.js 3.
+High-performance native companion daemon and CLI built in Rust for Farming Simulator 25 local mod detection, cryptographic verification, and differential synchronization.
 
 ---
 
-## 🛠️ Architecture & Bonnes Pratiques Rust
+## Overview
 
-Le projet applique rigoureusement les directives des skills Rust intégrées (`rust-skills`, `rust-patterns`, `rust-testing`, `rust-best-practices`) :
+The FarmLink Companion is a lightweight (4.3 MB standalone binary) native client engineered in Rust (2021 Edition). It bridges the gap between the player's local game installation and the FarmLink web platform.
 
-1. **Séparation Bibliothèque / Binaire (`proj-lib-main-split`)** :
-   - `src/lib.rs` : Coeur métier, API publique, modules réutilisables.
-   - `src/main.rs` : Point d'entrée CLI minimaliste basé sur `clap` et `anyhow`.
-2. **Gestion des erreurs typées (`err-thiserror-lib` & `err-anyhow-app`)** :
-   - Bibliothèque basée sur `thiserror::Error` (`ClientError`).
-   - Binaire CLI utilisant `anyhow::Result` avec enrichissement contextuel (`with_context`).
-   - Zéro `unwrap()` dans le code de production (`err-no-unwrap-prod`).
-3. **Gestion asynchrone & Concurrence (`async-tokio-fs`, `async-bounded-channel`)** :
-   - Moteur basé sur **Tokio** et **Axum 0.8**.
-   - Téléchargement concurrent contrôlé par sémaphore (`tokio::sync::Semaphore`).
-   - Diffusion d'événements en temps réel via `tokio::sync::broadcast` et `mpsc`.
-   - Écriture atomique sécurisée : téléchargement vers un fichier temporaire, validation SHA-256, puis renommage atomique vers `.zip`.
-4. **Performance & Optimisation Mémoire (`mem-with-capacity`, `perf-io-buffering`)** :
-   - Calcul de hash SHA-256 en flux avec `BufReader` de 64 Ko.
-   - Système de cache disque (`~/.config/farmlink/cache.json`) pour éviter de recalculer le hash des archives inchangées (scan de dizaines de gigaoctets en quelques millisecondes).
-   - Profil release avec LTO fat, 1 codegen-unit et binaire final compact (4.3 Mo).
-5. **Tests & TDD (`rust-testing`)** :
-   - Tests unitaires complets dans chaque module (`#[cfg(test)] mod tests`).
-   - Tests d'intégration end-to-end dans `tests/companion_integration_test.rs` validant le serveur HTTP, le handshake WebSocket et les commandes.
+The application operates in two modes:
+1. **Background IPC Daemon**: Runs an Axum HTTP and WebSocket server on `127.0.0.1:45823`, allowing the browser dashboard to read local mod inventory, trigger synchronized downloads, and monitor progress without native browser extensions.
+2. **Standalone Command-Line Tool (CLI)**: Allows players and headless setups to scan directories, compute cryptographic hashes, synchronize modpacks from remote manifests, and launch Farming Simulator 25 directly from the terminal.
 
 ---
 
-## 📂 Structure des Modules
+## Key Features
 
-| Module | Fichier | Description |
+- **Persistent SHA-256 Disk Cache**: Uses a fast disk-backed cache (`~/.config/farmlink/cache.json`) indexed by file size and modification timestamp (`mtime`). Unchanged archives bypass re-hashing, allowing scans of dozens of gigabytes in milliseconds.
+- **Atomic Temp-Swap Downloads**: Streams downloads into temporary files (`.farmlink_tmp_<nanos>`), computes SHA-256 on the fly, and validates the hash against the server manifest before atomically renaming to `.zip`. Corrupt or truncated files are automatically discarded.
+- **In-Memory Streaming XML Parser**: Inspects archive contents without full disk decompression using `quick-xml` to extract `modDesc.xml` metadata (multilingual titles, version, author, descVersion, and multiplayer compatibility).
+- **Concurrency Rate Limiting**: Regulates parallel HTTP downloads via `tokio::sync::Semaphore` to maximize network throughput without saturating disk I/O.
+- **Real-Time WebSocket IPC**: Streams state updates (`scanning`, `syncing`, `idle`, `error`) and granular byte transfer progress to connected frontend clients using Tokio broadcast and MPSC channels.
+- **Cross-Platform FS25 Detection**: Auto-detects Farming Simulator 25 directories across Windows (`%USERPROFILE%/Documents/My Games/FarmingSimulator2025/mods`), Linux standard XDG directories, and Steam Proton prefixes (Steam AppID `2300320`).
+- **Game Launcher & URI Protocol**: Launches the game via Steam or direct executable, with built-in support for `farmlink://join?server=...&addr=...` deep-link URIs.
+
+---
+
+## Architecture & Directory Structure
+
+The codebase adheres strictly to Rust best practices, maintaining a clean library and binary split (`proj-lib-main-split`):
+
+```
+client/
+├── src/
+│   ├── fs25/
+│   │   ├── mod.rs               # FS25 module definitions
+│   │   ├── mod_desc.rs          # Streaming XML parser for modDesc.xml metadata
+│   │   └── scanner.rs           # Directory scanner, SHA-256 hashing, and disk cache
+│   ├── config.rs                # Multi-OS path detection and persistent JSON configuration
+│   ├── downloader.rs            # Async concurrent download manager with atomic placement
+│   ├── error.rs                 # Strongly-typed library errors (thiserror)
+│   ├── launcher.rs              # Steam and executable launcher, URI protocol handler
+│   ├── lib.rs                   # Library crate entrypoint and public interface
+│   ├── main.rs                  # CLI command runner (clap + anyhow)
+│   ├── manifest.rs              # Remote manifest client and differential comparison engine
+│   ├── protocol.rs              # Typed JSON WebSocket IPC message schemas
+│   └── server.rs                # Axum HTTP/WebSocket local IPC daemon
+├── tests/
+│   └── companion_integration_test.rs  # End-to-end HTTP and WebSocket IPC integration tests
+├── Cargo.toml                   # Crate manifest, dependencies, and release LTO profile
+└── README.md                    # Module documentation
+```
+
+### IPC Endpoints (`127.0.0.1:45823`)
+
+| Protocol | Path | Description |
 |---|---|---|
-| **Config** | `src/config.rs` | Détection automatique multi-OS du dossier FS25 (Windows `%USERPROFILE%/Documents/My Games/...`, Linux Proton Steam AppID 2300320, standard XDG), persistance JSON dans `~/.config/farmlink/config.json`. |
-| **FS25 ModDesc** | `src/fs25/mod_desc.rs` | Parseur XML streaming (`quick-xml`) pour `modDesc.xml` (titres multilingues EN/FR/DE, version, auteur, descVersion, support multijoueur). |
-| **FS25 Scanner** | `src/fs25/scanner.rs` | Scanner d'archives `.zip`, calcul SHA-256 et cache persistant indexé par taille et mtime. |
-| **Manifest** | `src/manifest.rs` | Modèles DTO synchronisés avec le backend Go (`/api/v1/servers/:id/manifest`), calcul différentiel (`synced`, `outdated`, `missing`, `extra`). |
-| **Downloader** | `src/downloader.rs` | Gestionnaire de téléchargement asynchrone en streaming avec validation cryptographique et rapport de progression. |
-| **Protocol** | `src/protocol.rs` | Messages typés JSON échangés via WebSocket (`ClientMessage`, `ServerMessage`, `CompanionState`). |
-| **Server** | `src/server.rs` | Démon local Axum avec WebSocket `/ws`, `/health`, `/status`, `/api/mods` et CORS permissif pour le web local. |
-| **Launcher** | `src/launcher.rs` | Lancement de Farming Simulator 25 via Steam ou binaire direct, support du protocole URI `farmlink://join?server=...&addr=...`. |
+| `WebSocket` | `/ws` | Bi-directional JSON event stream (`scan`, `sync`, `progress`, `status`) |
+| `GET` | `/health` | Daemon liveness check |
+| `GET` | `/status` | Returns companion state, detected FS25 path, and mod counts |
+| `GET` | `/api/mods` | Returns scanned local mods with versions and SHA-256 hashes |
 
 ---
 
-## 🚀 Utilisation de la CLI
+## Configuration & Environment Variables
 
-### 1. Démarrer le démon local (arrière-plan pour le frontend web)
+The companion stores user settings and cache data in platform-specific configuration directories:
+
+- **Linux**: `~/.config/farmlink/config.json` & `~/.config/farmlink/cache.json`
+- **Windows**: `%APPDATA%\farmlink\config.json` & `%APPDATA%\farmlink\cache.json`
+
+### CLI Parameters & Options
+
+| Command / Flag | Default | Description |
+|---|---|---|
+| `daemon [--port <PORT>]` | `45823` | Start background IPC server for web dashboard integration |
+| `scan [--path <PATH>]` | Auto-detected | Scan and display local FS25 mods, versions, and hashes |
+| `sync <SERVER_ID> [--backend-url <URL>]` | `http://localhost:8088` | Synchronize local mods folder with a server manifest |
+| `status` | — | Display current daemon status and configured paths |
+| `config show` | — | Print active configuration |
+| `config set-mods-path <PATH>` | — | Explicitly set and persist custom FS25 mods folder |
+| `join <ADDRESS>` | — | Launch Farming Simulator 25 and join dedicated server |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- [Rust](https://www.rust-lang.org/) 1.80 or higher (Cargo package manager)
+
+### 1. Run the Local Daemon
+
+Start the background daemon for integration with the FarmLink web dashboard:
+
 ```bash
 cargo run -- daemon
-# Ou avec un port personnalisé :
-cargo run -- daemon --port 45823
 ```
-Le serveur écoute sur :
-- **WebSocket** : `ws://127.0.0.1:45823/ws`
-- **HTTP Statut** : `http://127.0.0.1:45823/status`
-- **HTTP Santé** : `http://127.0.0.1:45823/health`
 
-### 2. Scanner les mods locaux
+The daemon listens on `ws://127.0.0.1:45823/ws` and `http://127.0.0.1:45823/status`.
+
+### 2. Standalone CLI Usage
+
 ```bash
+# Scan local FS25 mods folder
 cargo run -- scan
-# Ou sur un dossier spécifique :
-cargo run -- scan --path /chemin/vers/mods
-```
 
-Sortie console :
-```text
-Scanning mods directory: /home/rauxde/.local/share/FarmingSimulator2025/mods
-
-FILE NAME                           TITLE                     VERSION            SIZE SHA-256 HASH
-------------------------------------------------------------------------------------------------------------------------------------------------------
-FS25_ClaasLexion8900.zip            Claas Lexion 8900 Pack    1.0.2.0        125.9 MB 03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4
-FS25_Courseplay.zip                 Courseplay FS25 NextGen   7.4.1.0         14.7 MB c83d6a9956d498b7921a24d550e0468e0d4948f93616238b1d4317135084922f
-FS25_JohnDeere_7R.zip               John Deere 7R Series 2024 1.2.0.0         80.6 MB 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
-------------------------------------------------------------------------------------------------------------------------------------------------------
-Total: 3 mods verified | Total Size: 221.20 MB (0.22 GB)
-```
-
-### 3. Synchroniser directement avec un serveur FarmLink
-```bash
+# Sync with a dedicated server
 cargo run -- sync b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22 --backend-url http://localhost:8088
-```
 
-### 4. Consulter l'état et la configuration
-```bash
-cargo run -- status
+# Check configuration
 cargo run -- config show
-cargo run -- config set-mods-path /nouveau/chemin/mods
+
+# Launch game to server
+cargo run -- join "zielonka.farmlink-servers.eu:10823"
 ```
 
-### 5. Rejoindre un serveur (Lancement FS25)
+### 3. Build Optimized Release Binary
+
 ```bash
-cargo run -- join "zielonka.farmlink-servers.eu:10823"
-# Ou via l'URL personnalisée :
-cargo run -- join "farmlink://join?server=srv_01&addr=zielonka.farmlink-servers.eu:10823"
+cargo build --release
 ```
+
+Produces an optimized standalone binary in `target/release/farmlink-companion` (4.3 MB with fat LTO and stripped debug symbols).
 
 ---
 
-## 🧪 Tests & Qualité de code
+## Testing & Quality Assurance
 
 ```bash
-# Exécution de l'ensemble des tests (unitaires + intégration)
+# Run unit and integration tests
 cargo test
 
-# Vérification du respect strict des règles Clippy
+# Run strict Clippy linter checks
 cargo clippy --all-targets --all-features -- -D warnings
 
-# Vérification du formatage
+# Verify source formatting
 cargo fmt --check
-
-# Compilation optimisée en release (binaire autonome de 4.3 Mo)
-cargo build --release
 ```
