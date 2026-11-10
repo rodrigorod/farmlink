@@ -10,9 +10,6 @@ use crate::error::Result;
 /// Default backend API URL.
 pub const DEFAULT_BACKEND_URL: &str = "http://localhost:8088";
 
-/// Default companion WebSocket and IPC port.
-pub const DEFAULT_COMPANION_PORT: u16 = 45823;
-
 /// FarmLink client runtime configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Config {
@@ -21,9 +18,6 @@ pub struct Config {
 
     /// Remote FarmLink backend API endpoint.
     pub backend_url: String,
-
-    /// Local HTTP / WebSocket listener port for web companion communication.
-    pub port: u16,
 
     /// Optional user API token for authenticated downloads/sync.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -39,7 +33,6 @@ impl Default for Config {
         Self {
             mods_path: detect_default_fs25_mods_path(),
             backend_url: DEFAULT_BACKEND_URL.to_string(),
-            port: DEFAULT_COMPANION_PORT,
             api_token: None,
             auto_sync: false,
         }
@@ -161,7 +154,6 @@ mod tests {
     fn default_config_has_valid_fields() {
         let cfg = Config::default();
         assert_eq!(cfg.backend_url, DEFAULT_BACKEND_URL);
-        assert_eq!(cfg.port, DEFAULT_COMPANION_PORT);
         assert!(!cfg.auto_sync);
         assert!(cfg.api_token.is_none());
         assert!(!cfg.mods_path.as_os_str().is_empty());
@@ -170,7 +162,6 @@ mod tests {
     #[test]
     fn serialization_roundtrip_works() {
         let cfg = Config {
-            port: 45899,
             auto_sync: true,
             api_token: Some("secret-token-123".to_string()),
             mods_path: PathBuf::from("/custom/mods/path"),

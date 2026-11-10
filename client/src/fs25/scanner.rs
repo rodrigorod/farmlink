@@ -198,6 +198,14 @@ impl ModScanner {
             }
         }
 
+        // Prune deleted files from persistent cache to avoid unbounded growth
+        let found_names: std::collections::HashSet<&str> = results.iter().map(|m| m.file_name.as_str()).collect();
+        let initial_cache_len = self.cache.len();
+        self.cache.retain(|k, _| found_names.contains(k.as_str()));
+        if self.cache.len() != initial_cache_len {
+            cache_modified = true;
+        }
+
         if cache_modified {
             self.save_cache();
         }
@@ -246,28 +254,23 @@ pub fn extract_mod_desc_from_zip(path: &Path) -> Result<ModDesc> {
     let file = File::open(path)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
-    // Locate modDesc.xml index, prioritizing root
+    // Locate modDesc.xml index in a single pass, prioritizing root
     let mut target_index = None;
+    let mut fallback_index = None;
     for i in 0..archive.len() {
         if let Ok(entry) = archive.by_index(i) {
-            if entry.name().eq_ignore_ascii_case("moddesc.xml") {
+            let name = entry.name();
+            if name.eq_ignore_ascii_case("moddesc.xml") {
                 target_index = Some(i);
                 break;
             }
-        }
-    }
-    if target_index.is_none() {
-        for i in 0..archive.len() {
-            if let Ok(entry) = archive.by_index(i) {
-                if entry.name().to_lowercase().ends_with("/moddesc.xml") {
-                    target_index = Some(i);
-                    break;
-                }
+            if fallback_index.is_none() && name.to_lowercase().ends_with("/moddesc.xml") {
+                fallback_index = Some(i);
             }
         }
     }
 
-    let index = target_index.ok_or_else(|| {
+    let index = target_index.or(fallback_index).ok_or_else(|| {
         ClientError::ModDescNotFound(
             path.file_name()
                 .unwrap_or_default()

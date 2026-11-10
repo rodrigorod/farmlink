@@ -271,7 +271,10 @@ async fn download_single_mod_verified(
             });
         }
 
-        // Atomic move to target filename
+        // Atomic move to target filename, ensuring existing file is replaced cleanly on all platforms
+        if destination.exists() {
+            let _ = fs::remove_file(destination).await;
+        }
         fs::rename(&temp_destination, destination).await?;
         info!(
             "successfully downloaded and verified '{}' (SHA256: {})",
