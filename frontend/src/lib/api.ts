@@ -13,9 +13,10 @@ export async function apiFetch<T>(
     headers.set('Content-Type', 'application/json')
   }
 
+  const apiBase = ((import.meta as any).env?.VITE_API_BASE_URL as string | undefined) || 'http://localhost:8088'
   const url = endpoint.startsWith('http')
     ? endpoint
-    : `http://localhost:8088${endpoint}`
+    : `${apiBase.replace(/\/$/, '')}${endpoint}`
 
   const controller = new AbortController()
   // Uploads get 5 min; regular requests timeout after 1.5s to allow fast offline fallback
