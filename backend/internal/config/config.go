@@ -23,8 +23,8 @@ func Load() *Config {
 	env := getEnv("ENV", "development")
 	jwtSecret := getEnv("JWT_SECRET", "")
 
-	if (env == "production" || env == "staging") && (jwtSecret == "" || jwtSecret == "farmlink-dev-secret-key-fs25") {
-		panic("JWT_SECRET must be configured with a secure key in production/staging")
+	if (env == "production" || env == "staging") && (len(jwtSecret) < 32 || jwtSecret == "farmlink-dev-secret-key-fs25") {
+		panic("JWT_SECRET must be configured with a secure key (at least 32 characters) in production/staging")
 	}
 
 	if jwtSecret == "" {

@@ -159,21 +159,20 @@ func (h *ModHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find modDesc.xml case-insensitively, prioritizing top-level root
+	// Find modDesc.xml case-insensitively, prioritizing top-level root in a single pass
 	var modDescFile *zip.File
+	var fallbackDescFile *zip.File
 	for _, f := range zipReader.File {
 		if strings.EqualFold(f.Name, "moddesc.xml") {
 			modDescFile = f
 			break
 		}
+		if fallbackDescFile == nil && strings.EqualFold(filepath.Base(f.Name), "moddesc.xml") {
+			fallbackDescFile = f
+		}
 	}
 	if modDescFile == nil {
-		for _, f := range zipReader.File {
-			if strings.EqualFold(filepath.Base(f.Name), "moddesc.xml") {
-				modDescFile = f
-				break
-			}
-		}
+		modDescFile = fallbackDescFile
 	}
 
 	if modDescFile == nil {

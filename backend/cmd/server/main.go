@@ -49,7 +49,10 @@ func main() {
 		slog.Error("s3 storage client initialization failed", "err", err)
 		os.Exit(1)
 	}
-	_ = s3Client.EnsureBucket(ctx)
+	if err := s3Client.EnsureBucket(ctx); err != nil {
+		slog.Error("s3 storage bucket check failed", "err", err)
+		os.Exit(1)
+	}
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(dbPool, cfg.JWTSecret)
@@ -77,11 +80,10 @@ func main() {
 	handler := corsMiddleware(mux)
 
 	server := &http.Server{
-		Addr:         ":" + cfg.Port,
-		Handler:      handler,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 60 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:              ":" + cfg.Port,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	// Graceful shutdown channel

@@ -61,24 +61,36 @@ func NewClient(ctx context.Context, endpoint, publicURL, accessKey, secretKey, b
 	return c, nil
 }
 
-// EnsureBucket creates the target bucket if it does not already exist.
+// EnsureBucket creates the target bucket if it does not already exist and applies public read access.
 func (c *Client) EnsureBucket(ctx context.Context) error {
 	_, err := c.client.HeadBucket(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(c.bucket),
 	})
-	if err == nil {
-		return nil
+	if err != nil {
+		slog.Info("creating s3 bucket", "bucket", c.bucket)
+		_, err = c.client.CreateBucket(ctx, &s3.CreateBucketInput{
+			Bucket: aws.String(c.bucket),
+		})
+		if err != nil {
+			slog.Warn("bucket creation note", "err", err)
+		}
 	}
 
-	slog.Info("creating s3 bucket", "bucket", c.bucket)
-	createInput := &s3.CreateBucketInput{
+	// Apply public read bucket policy on mods/* so companion clients can download directly
+	policy := fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": "*",
+			"Action": ["s3:GetObject"],
+			"Resource": ["arn:aws:s3:::%s/mods/*"]
+		}]
+	}`, c.bucket)
+	_, _ = c.client.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{
 		Bucket: aws.String(c.bucket),
-	}
-	_, err = c.client.CreateBucket(ctx, createInput)
-	if err != nil {
-		// MinIO often returns already owned by you
-		slog.Warn("bucket creation note", "err", err)
-	}
+		Policy: aws.String(policy),
+	})
+
 	return nil
 }
 

@@ -69,3 +69,25 @@ func TestHealthHandler(t *testing.T) {
 		t.Errorf("expected application/json, got %s", contentType)
 	}
 }
+
+func TestModUploadValidation(t *testing.T) {
+	handler := NewModHandler(nil, nil)
+
+	// Case 1: Invalid server UUID
+	req1 := httptest.NewRequest(http.MethodPost, "/api/v1/servers/bad-uuid/mods/upload", nil)
+	req1.SetPathValue("id", "bad-uuid")
+	w1 := httptest.NewRecorder()
+	handler.Upload(w1, req1)
+	if w1.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for bad server uuid, got %d", w1.Code)
+	}
+
+	// Case 2: Unauthorized (no claims in context)
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/servers/d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/mods/upload", nil)
+	req2.SetPathValue("id", "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11")
+	w2 := httptest.NewRecorder()
+	handler.Upload(w2, req2)
+	if w2.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for missing auth claims, got %d", w2.Code)
+	}
+}
