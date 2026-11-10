@@ -26,24 +26,25 @@ FarmLink synchronizes Farming Simulator 25 dedicated server modpacks with player
 ### Core Architecture
 
 ```
-┌─────────────────────────────────┐       ┌─────────────────────────────────┐
-│     FarmLink Web Dashboard      │       │     FarmLink Go Backend API     │
-│    (Vue 3, Tailwind, Pinia)     │◄─────►│    (Go 1.24, Postgres, S3)      │
-└────────────────┬────────────────┘       └────────────────┬────────────────┘
-                 │                                         │
-        WebSocket IPC (45823)                       HTTPS / S3 Direct
-                 │                                         │
-                 ▼                                         ▼
 ┌───────────────────────────────────────────────────────────────────────────┐
-│                     FarmLink Native Companion (Rust)                      │
-│            • SHA-256 disk cache     • Atomic temp-swap downloads          │
-│            • modDesc.xml parser     • Steam FS25 game launcher            │
-└───────────────────────────────────────────────────────────────────────────┘
+│                     FarmLink Desktop App (Tauri + Vue 3)                  │
+│       • Vue 3 web dashboard UI         • Rust native companion backend    │
+│       • Tauri IPC command bridge       • SHA-256 disk cache & scanner     │
+│       • Steam FS25 game launcher       • Concurrent atomic downloads      │
+└─────────────────────────────────────┬─────────────────────────────────────┘
+                                      │
+                              HTTPS / S3 Direct
+                                      │
+                                      ▼
+                      ┌─────────────────────────────────┐
+                      │     FarmLink Go Backend API     │
+                      │    (Go 1.24, Postgres, S3)      │
+                      └─────────────────────────────────┘
 ```
 
-- **Backend (`/backend`)**: Go HTTP API managing authentication, server manifests, and S3 multipart mod uploads. Single-pass streaming buffers files to disk once and cleans up failed uploads automatically.
-- **Frontend (`/frontend`)**: Industrial cockpit-style web dashboard for players and server admins. Manages modpack manifests, versions, and communicates with the local Rust daemon over WebSocket.
-- **Desktop Companion (`/client`)**: Self-contained 4.3 MB Rust daemon. Scans local mods folder, computes streaming SHA-256 digests with disk caching (`cache.json`), pulls outdated/missing mods concurrently, and verifies integrity before atomically placing them in the game directory.
+- **Backend (`/backend`)**: Go HTTP API managing authentication, server manifests, and S3 mod uploads.
+- **Frontend (`/frontend`)**: Modern Swiss-designed cockpit for players and server admins to view clusters, diff modpacks, and launch game sessions.
+- **Desktop Companion (`/client`)**: Self-contained Tauri / Rust native core that scans the FS25 mods folder, caches SHA-256 digests (`cache.json`), pulls missing mods concurrently, and executes 1-click server joins via Steam.
 
 ---
 
@@ -69,7 +70,7 @@ go run ./cmd/server/main.go
 ```
 Listens on `http://localhost:8088`. Database migrations and S3 bucket initialization run automatically on startup.
 
-### 4. Frontend Dashboard
+### 4. Frontend Dashboard (Web standalone)
 ```bash
 cd frontend
 npm install
@@ -77,19 +78,12 @@ npm run dev
 ```
 Accessible at `http://localhost:5173`.
 
-### 5. Native Rust Companion
+### 5. Native Desktop Companion (Tauri + Rust)
 ```bash
-cd client
-# Run background IPC daemon for web dashboard
-cargo run -- daemon
-
-# Or scan local FS25 mods folder directly from CLI
-cargo run -- scan
-
-# Or sync with a server manifest from terminal
-cargo run -- sync <server-id>
+cd frontend
+npm run tauri dev
 ```
-Daemon listens locally on `ws://127.0.0.1:45823/ws` and `http://127.0.0.1:45823/status`.
+Launches the full desktop application window with native Rust IPC, directory scanning, and game execution enabled.
 
 ---
 
