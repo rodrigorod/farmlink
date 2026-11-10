@@ -10,9 +10,6 @@ import {
   RefreshCw,
   Search,
   Shield,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
   FileArchive,
   ArrowLeft,
   Copy,
@@ -65,7 +62,7 @@ async function handleSyncAll() {
 
 function copyHash(hash: string) {
   navigator.clipboard.writeText(hash)
-  toastStore.info('Empreinte copiée', `Hash : ${hash}`)
+  toastStore.info('Empreinte SHA-256 copiée', `Hash : ${hash}`)
 }
 
 function copyInviteCode(code: string) {
@@ -77,116 +74,136 @@ function copyInviteCode(code: string) {
 <template>
   <div v-if="server" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
     
-    <!-- Top Back Navigation -->
-    <div class="flex items-center justify-between">
+    <!-- Top Back Navigation & Admin Button -->
+    <div class="flex items-center justify-between pb-2">
       <router-link
         to="/dashboard"
-        class="inline-flex items-center gap-2 text-xs font-mono text-muted hover:text-foreground transition-colors"
+        class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted hover:text-foreground transition-colors font-display"
       >
-        <ArrowLeft class="w-4 h-4" />
-        Retour aux serveurs
+        <span class="w-7 h-7 rounded-full bg-surface border border-surface-border flex items-center justify-center text-foreground hover:border-primary transition-colors">
+          <ArrowLeft class="w-3.5 h-3.5" />
+        </span>
+        <span>Retour aux serveurs</span>
       </router-link>
 
       <router-link
         v-if="server.isOwner"
         :to="`/servers/${server.id}/admin`"
       >
-        <Button size="sm" variant="outline" class="border-purple-800 text-purple-300 hover:bg-purple-950/40">
-          <Shield class="w-3.5 h-3.5" />
-          Gérer le Manifeste (Propriétaire)
+        <Button size="sm" variant="dark" class="rounded-full">
+          <Shield class="w-3.5 h-3.5 text-primary" />
+          Gérer le serveur
         </Button>
       </router-link>
     </div>
 
     <!-- Server Header Banner -->
-    <div class="industrial-panel p-6 bg-surface space-y-6">
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-surface-border">
+    <div class="bg-surface border border-surface-border rounded-2xl p-6 sm:p-8 space-y-6 shadow-swiss-sm">
+      <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 pb-6 border-b border-surface-border">
         <div>
           <div class="flex items-center gap-3">
-            <h1 class="text-xl font-black uppercase tracking-wider text-foreground">
+            <h1 class="text-2xl sm:text-3xl font-black uppercase tracking-tight text-foreground font-display">
               {{ server.name }}
             </h1>
             <Badge v-if="server.status === 'synced'" variant="synced">
-              🟢 Synchronisé
+              ● Synchronisé
             </Badge>
             <Badge v-else-if="server.status === 'update_required'" variant="outdated">
-              🟠 Mise à jour requise
+              ○ Mise à jour
             </Badge>
             <Badge v-else variant="error">
-              🔴 Désynchronisé
+              ✕ Désynchronisé
             </Badge>
           </div>
-          <div class="flex flex-wrap items-center gap-4 text-xs font-mono text-muted mt-2">
-            <span>Carte : <strong class="text-foreground">{{ server.mapName }}</strong></span>
-            <span>&bull;</span>
-            <span>Version Requise : <strong class="text-primary">{{ server.modpackVersion }}</strong></span>
-            <span>&bull;</span>
-            <span>{{ server.modCount }} mods ({{ formatBytes(server.totalSizeBytes) }})</span>
+
+          <div class="flex flex-wrap items-center gap-3 text-xs font-mono text-muted mt-2">
+            <span class="text-primary font-bold">v{{ server.modpackVersion }}</span>
+            <span>•</span>
+            <span>Carte : {{ server.mapName }}</span>
+            <span>•</span>
+            <span>{{ server.address }}</span>
+            <span>•</span>
+            <span>{{ server.modCount }} mods</span>
+            <span>•</span>
+            <span>{{ formatBytes(server.totalSizeBytes) }}</span>
+
             <template v-if="server.inviteCode">
-              <span>&bull;</span>
-              <span
-                class="inline-flex items-center gap-1.5 px-2 py-0.5 bg-surface-raised border border-surface-border text-muted hover:text-foreground cursor-pointer"
+              <span>•</span>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-raised border border-surface-border text-muted hover:text-foreground text-[11px] cursor-pointer"
                 @click="copyInviteCode(server.inviteCode)"
                 title="Cliquer pour copier le code d'invitation"
               >
-                <span class="text-primary font-bold">CODE :</span>
+                <span class="text-primary font-bold">CODE:</span>
                 <span class="text-foreground font-bold">{{ server.inviteCode }}</span>
                 <Copy class="w-3 h-3 text-muted hover:text-primary transition-colors" />
-              </span>
+              </button>
             </template>
           </div>
         </div>
 
-        <!-- Global Action CTA: "Synchroniser tout via l'application compagnon" -->
-        <div class="flex items-center gap-3">
+        <!-- Global Action CTA: Synchroniser tout -->
+        <div class="flex items-center gap-3 shrink-0">
           <Button
             size="lg"
             variant="primary"
             @click="handleSyncAll"
             :disabled="companionStore.state.syncInProgress"
-            class="shadow-lg shadow-primary/10"
+            class="rounded-full shadow-swiss-md"
           >
             <RefreshCw :class="['w-4 h-4', companionStore.state.syncInProgress ? 'animate-spin' : '']" />
-            Synchroniser tout via l'app compagnon
+            Synchroniser tout le modpack
           </Button>
         </div>
       </div>
 
-      <!-- Sync Status Breakdown -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-        <div class="p-3 bg-surface-raised border border-surface-border flex items-center justify-between">
-          <span class="text-muted">Total Requis :</span>
-          <span class="font-bold text-foreground">{{ syncStats.total }} mods</span>
+      <!-- Sync Status Breakdown (Clean Swiss Stat Boxes) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        <div class="p-4 rounded-xl bg-surface-raised border border-surface-border">
+          <div class="text-[10px] font-bold uppercase tracking-wider text-muted font-display">Total Requis</div>
+          <div class="text-xl font-black font-display text-foreground mt-1">
+            {{ syncStats.total }} <span class="text-xs font-normal text-muted">mods</span>
+          </div>
         </div>
-        <div class="p-3 bg-surface-raised border border-surface-border flex items-center justify-between">
-          <span class="text-emerald-400">À jour localement :</span>
-          <span class="font-bold text-emerald-400">{{ syncStats.synced }}</span>
+
+        <div class="p-4 rounded-xl bg-surface-raised border border-surface-border">
+          <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 font-display">À jour localement</div>
+          <div class="text-xl font-black font-display text-emerald-600 dark:text-emerald-400 mt-1">
+            {{ syncStats.synced }} <span class="text-xs font-normal text-muted">mods</span>
+          </div>
         </div>
-        <div class="p-3 bg-surface-raised border border-surface-border flex items-center justify-between">
-          <span class="text-amber-400">Version obsolète :</span>
-          <span class="font-bold text-amber-400">{{ syncStats.outdated }}</span>
+
+        <div class="p-4 rounded-xl bg-surface-raised border border-surface-border">
+          <div class="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 font-display">Version obsolète</div>
+          <div class="text-xl font-black font-display text-amber-600 dark:text-amber-400 mt-1">
+            {{ syncStats.outdated }} <span class="text-xs font-normal text-muted">mods</span>
+          </div>
         </div>
-        <div class="p-3 bg-surface-raised border border-surface-border flex items-center justify-between">
-          <span class="text-rose-400">Mods manquants :</span>
-          <span class="font-bold text-rose-400">{{ syncStats.missing }}</span>
+
+        <div class="p-4 rounded-xl bg-surface-raised border border-surface-border">
+          <div class="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 font-display">Mods manquants</div>
+          <div class="text-xl font-black font-display text-rose-600 dark:text-rose-400 mt-1">
+            {{ syncStats.missing }} <span class="text-xs font-normal text-muted">mods</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Modpack Filter & Search Controls -->
-    <div class="industrial-panel p-4 bg-surface flex flex-col sm:flex-row items-center justify-between gap-3">
+    <div class="bg-surface border border-surface-border rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-swiss-sm">
       <!-- Search input -->
       <div class="relative w-full sm:w-80">
         <input
           v-model="searchQuery"
           type="text"
           placeholder="Rechercher un mod, fichier .zip, auteur..."
-          class="w-full bg-surface-raised border border-surface-border rounded-sm px-3 py-2 pl-9 text-xs text-foreground focus:outline-none focus:border-primary font-mono"
+          class="w-full bg-surface-raised border border-surface-border rounded-lg px-3 py-2 pl-9 text-xs text-foreground focus:outline-none focus:border-primary font-sans placeholder:text-muted"
         />
-        <Search class="w-4 h-4 absolute left-2.5 top-2.5 text-muted pointer-events-none" />
+        <Search class="w-4 h-4 absolute left-3 top-2.5 text-muted pointer-events-none" />
       </div>
 
-      <!-- Category Filter -->
+      <!-- Category Filter Pills -->
       <div class="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
         <button
           v-for="cat in ['all', 'Tractors', 'Harvesters', 'Tools', 'Gameplay']"
@@ -194,30 +211,30 @@ function copyInviteCode(code: string) {
           type="button"
           @click="selectedCategory = cat"
           :class="[
-            'px-2.5 py-1 text-xs rounded-sm uppercase tracking-wider font-mono transition-colors whitespace-nowrap',
+            'px-3 py-1.5 text-xs rounded-full uppercase tracking-wider font-bold transition-all whitespace-nowrap',
             selectedCategory === cat
-              ? 'bg-primary text-white font-bold'
+              ? 'bg-brand-dark text-white dark:bg-white dark:text-brand-dark shadow-sm'
               : 'bg-surface-raised text-muted hover:text-foreground border border-surface-border',
           ]"
         >
-          {{ cat === 'all' ? 'Tous' : cat }}
+          {{ cat === 'all' ? 'Tous les mods' : cat }}
         </button>
       </div>
     </div>
 
-    <!-- Mod List Table (Cahier des charges: Vue Joueur La liste des mods) -->
-    <div class="industrial-panel bg-surface overflow-hidden border border-surface-border">
+    <!-- Mod List Table (Inspired by Reference 1: E-KOOL Bottom Tabular Layout) -->
+    <div class="bg-surface rounded-2xl overflow-hidden border border-surface-border shadow-swiss-sm">
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs">
-          <thead class="bg-surface-raised border-b border-surface-border text-muted uppercase font-bold tracking-wider font-mono text-[11px]">
+          <thead class="bg-surface-raised border-b border-surface-border text-muted uppercase font-bold tracking-wider font-display text-[10px]">
             <tr>
-              <th class="py-3 px-4">Miniature</th>
-              <th class="py-3 px-4">Mod & Fichier (.zip)</th>
-              <th class="py-3 px-4">Catégorie / Auteur</th>
-              <th class="py-3 px-4 text-center">Version Serveur</th>
-              <th class="py-3 px-4 text-center">Version Locale</th>
-              <th class="py-3 px-4 text-center">Statut Client</th>
-              <th class="py-3 px-4 text-right">Téléchargement S3</th>
+              <th class="py-3.5 px-4 w-16">Miniature</th>
+              <th class="py-3.5 px-4">Mod & Archive ZIP</th>
+              <th class="py-3.5 px-4">Catégorie / Auteur</th>
+              <th class="py-3.5 px-4 text-center">Version Serveur</th>
+              <th class="py-3.5 px-4 text-center">Version Locale</th>
+              <th class="py-3.5 px-4 text-center">Statut Sync</th>
+              <th class="py-3.5 px-4 text-right">Téléchargement S3</th>
             </tr>
           </thead>
 
@@ -227,12 +244,12 @@ function copyInviteCode(code: string) {
               :key="mod.id"
               :class="[
                 'hover:bg-surface-raised/60 transition-colors',
-                !mod.isEnabled ? 'opacity-40 bg-black/20' : '',
+                !mod.isEnabled ? 'opacity-40 bg-black/5 dark:bg-black/20' : '',
               ]"
             >
-              <!-- Mod Miniature / Icon -->
-              <td class="py-3 px-4">
-                <div class="w-12 h-12 bg-surface-raised border border-surface-border rounded-sm overflow-hidden flex items-center justify-center shrink-0">
+              <!-- Thumbnail -->
+              <td class="py-3.5 px-4">
+                <div class="w-11 h-11 bg-surface-raised border border-surface-border rounded-lg overflow-hidden flex items-center justify-center shrink-0">
                   <img
                     v-if="mod.thumbnailUrl"
                     :src="mod.thumbnailUrl"
@@ -240,26 +257,26 @@ function copyInviteCode(code: string) {
                     class="w-full h-full object-cover"
                     loading="lazy"
                   />
-                  <FileArchive v-else class="w-6 h-6 text-muted" />
+                  <FileArchive v-else class="w-5 h-5 text-muted" />
                 </div>
               </td>
 
               <!-- Name & File name (.zip) -->
-              <td class="py-3 px-4">
-                <div class="font-bold text-foreground text-sm tracking-wide">
+              <td class="py-3.5 px-4">
+                <div class="font-bold text-foreground text-sm tracking-tight font-display">
                   {{ mod.name }}
                 </div>
                 <div class="font-mono text-[11px] text-muted flex items-center gap-1.5 mt-0.5">
                   <FileArchive class="w-3.5 h-3.5 text-primary" />
                   <span>{{ mod.fileName }}</span>
-                  <span class="text-muted/60">&bull;</span>
+                  <span class="text-muted/60">•</span>
                   <span>{{ formatBytes(mod.sizeBytes) }}</span>
                 </div>
               </td>
 
               <!-- Category & Author -->
-              <td class="py-3 px-4">
-                <span class="px-2 py-0.5 bg-surface-raised border border-surface-border rounded-sm font-mono text-[11px] text-foreground">
+              <td class="py-3.5 px-4">
+                <span class="px-2 py-0.5 bg-surface-raised border border-surface-border rounded-full font-mono text-[10px] text-foreground font-semibold">
                   {{ mod.category }}
                 </span>
                 <div class="text-[11px] text-muted mt-1">
@@ -267,16 +284,16 @@ function copyInviteCode(code: string) {
                 </div>
               </td>
 
-              <!-- Version requise par le serveur -->
-              <td class="py-3 px-4 text-center">
-                <span class="font-mono font-bold text-primary px-2 py-1 bg-surface-raised border border-surface-border rounded-sm">
+              <!-- Required Server Version -->
+              <td class="py-3.5 px-4 text-center">
+                <span class="font-mono font-bold text-primary px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full text-xs">
                   v{{ mod.requiredVersion }}
                 </span>
               </td>
 
-              <!-- Version locale détectée par l'app Rust -->
-              <td class="py-3 px-4 text-center font-mono">
-                <span v-if="mod.localVersion" class="text-foreground">
+              <!-- Local Version -->
+              <td class="py-3.5 px-4 text-center font-mono">
+                <span v-if="mod.localVersion" class="text-foreground font-semibold">
                   v{{ mod.localVersion }}
                 </span>
                 <span v-else class="text-muted italic">
@@ -284,30 +301,27 @@ function copyInviteCode(code: string) {
                 </span>
               </td>
 
-              <!-- Statut vérifié via l'app Rust -->
-              <td class="py-3 px-4 text-center">
+              <!-- Sync Status -->
+              <td class="py-3.5 px-4 text-center">
                 <Badge v-if="mod.status === 'synced'" variant="synced">
-                  <CheckCircle2 class="w-3 h-3 text-emerald-400" />
-                  À jour
+                  ● À jour
                 </Badge>
                 <Badge v-else-if="mod.status === 'outdated'" variant="outdated">
-                  <AlertTriangle class="w-3 h-3 text-amber-400" />
-                  Version différente
+                  ○ Obsolète
                 </Badge>
                 <Badge v-else variant="missing">
-                  <XCircle class="w-3 h-3 text-rose-400" />
-                  Manquant
+                  ✕ Manquant
                 </Badge>
               </td>
 
-              <!-- Lien de téléchargement direct S3 -->
-              <td class="py-3 px-4 text-right">
+              <!-- S3 Direct Download & Hash -->
+              <td class="py-3.5 px-4 text-right">
                 <div class="flex items-center justify-end gap-2">
                   <button
                     type="button"
                     @click="copyHash(mod.hashSha256)"
-                    class="p-1.5 text-muted hover:text-foreground bg-surface-raised border border-surface-border rounded-sm"
-                    title="Copier le SHA-256"
+                    class="p-1.5 text-muted hover:text-foreground bg-surface-raised border border-surface-border rounded-lg transition-colors"
+                    title="Copier l'empreinte SHA-256"
                   >
                     <Copy class="w-3.5 h-3.5" />
                   </button>
@@ -316,10 +330,10 @@ function copyInviteCode(code: string) {
                     :href="mod.downloadUrl"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center gap-1 px-2.5 py-1.5 bg-surface-raised hover:bg-surface-hover border border-surface-border text-foreground hover:text-primary rounded-sm transition-colors text-xs font-mono"
-                    title="Lien direct S3"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface-raised hover:bg-surface-hover border border-surface-border text-foreground hover:text-primary rounded-lg transition-colors text-xs font-mono font-bold"
+                    title="Télécharger depuis S3"
                   >
-                    <DownloadCloud class="w-3.5 h-3.5" />
+                    <DownloadCloud class="w-3.5 h-3.5 text-primary" />
                     <span>S3 Direct</span>
                   </a>
                 </div>
@@ -337,9 +351,9 @@ function copyInviteCode(code: string) {
   </div>
 
   <div v-else class="max-w-7xl mx-auto px-4 py-16 text-center">
-    <h2 class="text-lg font-bold text-foreground">Serveur introuvable</h2>
+    <h2 class="text-lg font-bold text-foreground font-display uppercase">Serveur introuvable</h2>
     <router-link to="/dashboard" class="text-primary text-xs font-mono mt-2 inline-block">
-      &larr; Revenir à la liste des serveurs
+      ← Revenir au tableau de bord
     </router-link>
   </div>
 </template>

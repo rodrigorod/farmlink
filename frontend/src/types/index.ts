@@ -38,7 +38,6 @@ export interface ModItem {
   localVersion?: string | null;
   status: LocalModStatus;
   sizeBytes: number;
-  hashMd5: string;
   hashSha256: string;
   author: string;
   downloadUrl: string;

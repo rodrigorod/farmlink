@@ -3,7 +3,6 @@ import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Navbar from '@/components/layout/Navbar.vue'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
-import { Tractor } from 'lucide-vue-next'
 import { useCompanionStore } from '@/stores/companion'
 
 const route = useRoute()
@@ -16,8 +15,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-background text-foreground flex flex-col font-sans">
-    <!-- Navbar (Hidden on auth if preferred, or present with minimal look) -->
+  <div class="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-150">
+    <!-- Navbar (Hidden on auth) -->
     <Navbar v-if="!isAuthRoute" />
 
     <!-- Main Content -->
@@ -25,25 +24,23 @@ onMounted(() => {
       <router-view />
     </main>
 
-    <!-- Cockpit Technical Footer -->
-    <footer v-if="!isAuthRoute" class="bg-surface border-t border-surface-border py-4 text-xs font-mono text-muted select-none">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div class="flex items-center gap-2">
-          <Tractor class="w-4 h-4 text-primary" />
-          <span class="font-bold text-foreground">FARMLINK FS25</span>
-          <span>&bull;</span>
-          <span>Protocole Modpack v2.4</span>
+    <!-- Clean Minimal Footer -->
+    <footer v-if="!isAuthRoute" class="bg-surface border-t border-surface-border py-5 text-xs text-muted select-none">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <img src="/logo_navbar.png" alt="FarmLink" class="h-6 w-auto object-contain shrink-0" />
+          <span class="font-display text-xs font-bold uppercase tracking-wider text-foreground">
+            FarmLink FS25
+          </span>
         </div>
 
-        <div class="flex items-center gap-4 text-[11px]">
-          <span>GIANTS Software Compatible</span>
-          <span>&bull;</span>
-          <span>Backend Go (REST/S3) &bull; Compagnon Rust (IPC)</span>
-        </div>
+        <p class="text-xs text-muted font-sans">
+          © 2026 FarmLink
+        </p>
       </div>
     </footer>
 
-    <!-- Global Industrial Toasts -->
+    <!-- Global Toasts -->
     <ToastContainer />
   </div>
 </template>
