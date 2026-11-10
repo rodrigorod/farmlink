@@ -4,63 +4,83 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: light;
+    --color-bg: #F5F5F1;
+    --color-surface: #FFFFFF;
+    --color-surface-raised: #EAE5DC;
+    --color-surface-border: #DCD7CC;
+    --color-surface-hover: #EFECE5;
+    --color-input: #FFFFFF;
+    --color-foreground: #0C0E0D;
+    --color-muted: #68706A;
+    --color-muted-fg: #484F4A;
+    --color-primary-muted: #EAF8ED;
   }
-  
+
+  .dark {
+    color-scheme: dark;
+    --color-bg: #0E120F;
+    --color-surface: #161B18;
+    --color-surface-raised: #212723;
+    --color-surface-border: #2A332C;
+    --color-surface-hover: #262E29;
+    --color-input: #1A201C;
+    --color-foreground: #F3F5F4;
+    --color-muted: #939B95;
+    --color-muted-fg: #B2BBB4;
+    --color-primary-muted: #173320;
+  }
+
   body {
-    background-color: #121417;
-    color: #F3F4F6;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--color-bg);
+    color: var(--color-foreground);
+    font-family: "Helvetica Neue", Helvetica, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Industrial & Cockpit touches */
+/* Swiss International Typographic Utilities */
+.font-display {
+  font-family: 'Archivo', 'Helvetica Neue', Helvetica, sans-serif;
+  letter-spacing: -0.03em;
+}
+
 .font-mono-numbers {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-feature-settings: 'tnum' on, 'zero' on;
 }
 
-/* Custom Cockpit Scrollbars */
+/* Swiss Editorial Cards & Hairlines */
+.swiss-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-surface-border);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.swiss-card:hover {
+  border-color: #159D3B;
+}
+
+.swiss-hairline {
+  border-color: var(--color-surface-border);
+}
+
+/* Modern Swiss Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #121417;
-  border-left: 1px solid #1f2327;
+  background: var(--color-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #2a3036;
-  border-radius: 2px;
+  background: var(--color-surface-border);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b434c;
-}
-
-/* Strict geometric industrial pattern */
-.industrial-panel {
-  background-color: #1a1d20;
-  border: 1px solid #2d333b;
-  position: relative;
-}
-
-.industrial-panel::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 4px;
-  height: 4px;
-  background-color: #2d333b;
-}
-
-/* Technical grid background */
-.bg-tech-grid {
-  background-size: 32px 32px;
-  background-image: 
-    linear-gradient(to right, rgba(45, 51, 59, 0.25) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(45, 51, 59, 0.25) 1px, transparent 1px);
+  background: var(--color-muted);
 }

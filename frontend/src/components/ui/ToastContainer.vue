@@ -23,17 +23,8 @@ function getIcon(type: string) {
   }
 }
 
-function getCardStyle(type: string) {
-  switch (type) {
-    case 'success':
-      return 'border-l-4 border-l-primary border-surface-border bg-surface'
-    case 'warning':
-      return 'border-l-4 border-l-accent border-surface-border bg-surface'
-    case 'error':
-      return 'border-l-4 border-l-destructive border-surface-border bg-surface'
-    default:
-      return 'border-l-4 border-l-blue-500 border-surface-border bg-surface'
-  }
+function getCardStyle(_type: string) {
+  return 'border border-surface-border bg-surface shadow-swiss-md'
 }
 
 function getIconColor(type: string) {
@@ -41,11 +32,11 @@ function getIconColor(type: string) {
     case 'success':
       return 'text-primary'
     case 'warning':
-      return 'text-accent'
+      return 'text-amber-500'
     case 'error':
       return 'text-destructive'
     default:
-      return 'text-blue-400'
+      return 'text-primary'
   }
 }
 </script>
@@ -64,7 +55,7 @@ function getIconColor(type: string) {
         v-for="toast in toastStore.toasts"
         :key="toast.id"
         :class="[
-          'pointer-events-auto p-4 shadow-xl border flex items-start gap-3 rounded-none relative',
+          'pointer-events-auto p-4 border flex items-start gap-3 rounded-lg relative',
           getCardStyle(toast.type),
         ]"
       >
@@ -73,17 +64,17 @@ function getIconColor(type: string) {
           :class="['w-5 h-5 shrink-0 mt-0.5', getIconColor(toast.type)]"
         />
         <div class="flex-1 min-w-0">
-          <h4 class="text-xs font-semibold uppercase tracking-wider text-foreground">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-foreground font-display">
             {{ toast.title }}
           </h4>
-          <p class="text-xs text-muted mt-1 leading-relaxed break-words">
+          <p class="text-xs text-muted mt-1 leading-relaxed break-words font-sans">
             {{ toast.message }}
           </p>
         </div>
         <button
           type="button"
           @click="toastStore.removeToast(toast.id)"
-          class="text-muted hover:text-foreground p-1 transition-colors"
+          class="text-muted hover:text-foreground p-1 transition-colors rounded-sm"
         >
           <X class="w-4 h-4" />
         </button>

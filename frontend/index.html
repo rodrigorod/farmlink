@@ -1,15 +1,36 @@
 <!doctype html>
-<html lang="fr" class="dark">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/tractor-icon.svg" />
+    <link rel="icon" type="image/png" href="/logo_navbar.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <title>FarmLink — FS25 Modpack Manager</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>FarmLink — International FS25 Modpack Protocol</title>
+    <script>
+      (function() {
+        try {
+          if (location.search.indexOf('mock_auth') !== -1) {
+            localStorage.setItem('farmlink_jwt', 'mock_token_admin');
+            localStorage.setItem('farmlink_role', 'admin');
+          }
+          if (location.search.indexOf('dark=1') !== -1) {
+            localStorage.setItem('farmlink_theme', 'dark');
+          } else if (location.search.indexOf('light=1') !== -1) {
+            localStorage.setItem('farmlink_theme', 'light');
+          }
+          var saved = localStorage.getItem('farmlink_theme');
+          if (saved === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-background text-foreground antialiased selection:bg-primary selection:text-white">
+  <body class="bg-background text-foreground antialiased selection:bg-primary selection:text-white transition-colors duration-150">
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

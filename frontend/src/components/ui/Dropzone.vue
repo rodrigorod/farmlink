@@ -54,7 +54,7 @@ function uploadDemoMod(name: string, size: number) {
 </script>
 
 <template>
-  <div class="industrial-panel p-6 border-dashed border-2 border-surface-border hover:border-primary transition-colors bg-surface/50">
+  <div class="bg-surface rounded-2xl p-6 sm:p-8 border-2 border-dashed border-surface-border hover:border-primary transition-all shadow-swiss-sm">
     <input
       ref="fileInput"
       type="file"
@@ -67,29 +67,29 @@ function uploadDemoMod(name: string, size: number) {
       @dragover="handleDragOver"
       @dragleave="handleDragLeave"
       @drop="handleDrop"
-      class="flex flex-col items-center justify-center text-center cursor-pointer py-8"
+      class="flex flex-col items-center justify-center text-center cursor-pointer py-6"
       @click="triggerFilePicker"
     >
       <div
         :class="[
-          'w-16 h-16 rounded-sm flex items-center justify-center mb-4 transition-transform border',
+          'w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform border',
           isDragging ? 'scale-110 bg-primary/20 border-primary text-primary' : 'bg-surface-raised border-surface-border text-muted',
         ]"
       >
-        <UploadCloud class="w-8 h-8" />
+        <UploadCloud class="w-7 h-7" />
       </div>
 
-      <h3 class="text-base font-semibold text-foreground tracking-wide">
-        Glissez-déposez une archive de mod <span class="text-primary font-mono">.zip</span>
+      <h3 class="text-base font-bold uppercase tracking-wider text-foreground font-display">
+        Glissez-déposez une archive mod <span class="text-primary font-mono lowercase">.zip</span>
       </h3>
-      <p class="text-xs text-muted max-w-sm mt-1">
-        Le backend extrait automatiquement le <code class="text-xs text-foreground bg-surface-raised px-1 py-0.5 rounded">modDesc.xml</code>, calcule les empreintes MD5/SHA-256 et téléverse vers le stockage S3.
+      <p class="text-xs text-muted max-w-sm mt-1.5 font-sans leading-relaxed">
+        Extraction automatique du fichier <code class="text-xs text-foreground bg-surface-raised px-1.5 py-0.5 rounded font-mono">modDesc.xml</code>, calcul des hachages SHA-256 et téléversement direct vers S3.
       </p>
 
-      <div class="mt-4 flex items-center gap-2">
-        <Button size="sm" variant="outline" @click.stop="triggerFilePicker">
+      <div class="mt-5 flex items-center gap-2">
+        <Button size="sm" variant="outline" class="rounded-full" @click.stop="triggerFilePicker">
           <FileArchive class="w-4 h-4 text-primary" />
-          Parcourir les fichiers
+          Parcourir les fichiers locaux
         </Button>
       </div>
     </div>
@@ -98,20 +98,20 @@ function uploadDemoMod(name: string, size: number) {
     <div class="border-t border-surface-border mt-4 pt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
       <span class="flex items-center gap-1.5 font-mono text-[11px]">
         <Check class="w-3.5 h-3.5 text-primary" />
-        Simulations rapides de test :
+        Simulations rapides :
       </span>
       <div class="flex items-center gap-2">
         <button
           type="button"
           @click.stop="uploadDemoMod('FS25_Kuhn_Balandier_v1.zip', 45200000)"
-          class="px-2 py-1 bg-surface-raised hover:bg-surface-hover border border-surface-border text-foreground text-xs rounded-sm transition-colors"
+          class="px-2.5 py-1 bg-surface-raised hover:bg-surface-hover border border-surface-border text-foreground text-xs rounded-full transition-colors font-mono"
         >
           + FS25_Kuhn_Balandier.zip
         </button>
         <button
           type="button"
           @click.stop="uploadDemoMod('FS25_corrupted_modDesc.zip', 1200000)"
-          class="px-2 py-1 bg-surface-raised hover:border-red-600/50 text-red-400 border border-surface-border text-xs rounded-sm transition-colors flex items-center gap-1"
+          class="px-2.5 py-1 bg-surface-raised hover:border-red-500/50 text-red-500 border border-surface-border text-xs rounded-full transition-colors flex items-center gap-1 font-mono"
         >
           <AlertOctagon class="w-3 h-3" />
           Test Erreur XML
